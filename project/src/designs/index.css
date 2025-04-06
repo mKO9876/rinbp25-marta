@@ -1,0 +1,79 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.1;
+  font-weight: 500;
+  background-color: #9980C1;
+  color: #FFFFFF;
+  /* Svijetla boja za kontrast */
+  font-size: 1.2rem;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  justify-content: center;
+  background-color: #9980C1;
+  /* Osiguraj da i body ima istu pozadinu */
+  color: #FFFFFF;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+  color: #FFFFFF;
+}
+
+input {
+  margin: 20px;
+  width: 300px;
+  height: 25px;
+  padding: 7px;
+  border: 2px solid #FFFFFF;
+  border-radius: 10px;
+  font-size: 0.9em;
+  color: #213547;
+  background-color: #FFFFFF;
+  box-shadow: 5px 5px #6f5d96;
+}
+
+a {
+  font-weight: 500;
+  color: #FFD700;
+  /* Zlatnožuta za bolju vidljivost na ljubičastoj */
+  text-decoration: underline;
+}
+
+a:hover {
+  color: #fffacd;
+  /* Svjetlija žuta za hover */
+}
+
+button {
+  border-radius: 8px;
+  border: 3px solid #ffffff;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 600;
+  font-family: inherit;
+  background-color: #FBA405;
+  color: #213547;
+  cursor: pointer;
+  box-shadow: 3px 3px #6f5d96;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #dd9000;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}

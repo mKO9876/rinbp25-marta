@@ -1,34 +1,22 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Link } from "react-router";
+
+import logo from "./assets/logo_2_2.png";
+import "./designs/App.css";
+import "./designs/index.css";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div id="home_container">
+      <img src={logo} alt="logo_image" />
+      <h2>Only the Biggest Brains Survive.</h2>
+      <p>Put your brain to the test—completely free! Challenge yourself with The Big Brain Theory,
+        the ultimate trivia game where knowledge is power and every question proves just how sharp you really are.
+        Play now, no paywalls, just pure brainy fun!</p>
+      <div id='home_button_container'>
+        <Link to="/login"><button>Log in</button></Link>
+        <Link to="/signup"><button>Sign up</button></Link>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </div>
   )
 }
 
