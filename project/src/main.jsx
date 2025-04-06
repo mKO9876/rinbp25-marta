@@ -5,6 +5,7 @@ import NoPage from "./pages/NoPage";
 import LogIn from "./pages/LogIn";
 import SignUp from "./pages/SignUp";
 import Lobby from "./pages/Lobby";
+import Account from "./pages/Account";
 
 
 const root = document.getElementById("root");
@@ -16,6 +17,7 @@ ReactDOM.createRoot(root).render(
       <Route path="/login" element={<LogIn />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/lobby" element={<Lobby />} />
+      <Route path="/account" element={<Account />} />
       <Route path="*" element={<NoPage />} />
     </Routes>
   </BrowserRouter>

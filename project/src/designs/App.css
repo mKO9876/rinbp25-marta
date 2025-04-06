@@ -50,7 +50,7 @@
 }
 
 #category_container {
-    background-color: "rgba(255,255,255,0.1)";
+    background-color: rgba(255, 255, 255, 0.1);
     padding: 2rem;
     border-radius: 16px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -119,6 +119,87 @@
 
 /* NAV TOP */
 
+/* ACCOUNT */
+#account_container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#account_card {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+}
+
+#account_card label {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+    display: block;
+    margin-top: 1rem;
+}
+
+/* ACCOUNT */
+
+
+/* const styles= {
+    container: {
+        backgroundColor: "#9980C1",
+            minHeight: "100vh",
+            color: "#FFFFFF",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            fontFamily: "Inter, sans-serif",
+            padding: "2rem"
+    }
+
+    ,
+    card: {
+        backgroundColor: "rgba(255,255,255,0.1)",
+            padding: "2rem",
+            borderRadius: "16px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            width: "100%",
+            maxWidth: "500px"
+    }
+
+    ,
+    label: {
+        fontSize: "1rem",
+            marginBottom: "0.3rem",
+            display: "block",
+            marginTop: "1rem"
+    }
+
+    ,
+    input: {
+        width: "100%",
+            padding: "0.8rem",
+            borderRadius: "10px",
+            border: "none",
+            fontSize: "1rem",
+            color: "#213547"
+    }
+
+    ,
+    button: {
+        backgroundColor: "#FBA405",
+            color: "#213547",
+            padding: "0.8rem 1.5rem",
+            borderRadius: "10px",
+            fontWeight: "600",
+            fontSize: "1rem",
+            border: "none",
+            marginTop: "2rem",
+            cursor: "pointer",
+            boxShadow: "3px 3px #6f5d96"
+    }
+}
+
+; */
 
 /* @media only screen and (max-width: 600px) {
 
