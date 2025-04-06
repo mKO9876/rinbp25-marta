@@ -1,75 +1,92 @@
-# Project Idea: Multiplayer Game Backend
+# Specifikacija projekta: Multiplayer Trivia Game
 
-## Project Description
+## Opis projekta
 
-Development of a real-time multiplayer game backend system utilizing Supabase Realtime for game state synchronization and Redis for ranking and player matchmaking systems, designed for local network gameplay with a focus on low-latency updates.
+Multiplayer trivia igra s real-time funkcionalnostima, izgrađena koristeći React za frontend, Redis za leaderboard i matchmaking sustav, te Supabase za sinkronizaciju stanja igre. Projekt je fokusiran na učenje i implementaciju real-time funkcionalnosti u multiplayer igrama.
 
-## System Architecture
+## Tehnologije
 
-### 1. Main Components
+- **Frontend**: React.js
+- **Backend**: Node.js
+- **Baza podataka**: Supabase (PostgreSQL)
+- **Caching i Real-time**: Redis
+- **Autentifikacija**: Supabase Auth
 
-- **Supabase Realtime**
+## Funkcionalnosti
 
-  - Player authentication and authorization
-  - Real-time game state synchronization
-  - Persistent data storage
-  - WebSocket communication
+### 1. Korisnički sustav
 
-- **Redis Server**
+- Registracija i prijava korisnika
+- Osnovni profil korisnika
+- Pregled osnovne statistike igrača
 
-  - Ranking list management
-  - Player matchmaking system
-  - Game queue management
+### 2. Matchmaking sustav (Redis)
 
-### 2. Key Functionalities
+- Pronalaženje protivnika
+- Jednostavan sustav čekanja u redu
+- Povezivanje 2-4 igrača u sobu
+- Privatne igre s kodom:
+  - Generiranje jedinstvenog koda za sobu
+  - Povezivanje prijatelja kroz unos koda
+  - Mogućnost čekanja svih igrača prije početka
+  - Automatsko zatvaranje sobe nakon početka igre
 
-#### 2.1 Authentication and Profiles
+### 3. Real-time igra (Supabase)
 
-- Player profiles
-- Basic player statistics
-- Game history tracking
+- Sinkronizacija stanja igre između igrača
+- Real-time ažuriranje bodova
+- Osnovni chat između igrača
+- Timer za odgovore
+- Automatsko prepoznavanje pobjednika
 
-#### 2.2 Real-time Synchronization
+### 4. Leaderboard sustav (Redis)
 
-- Player position updates
-- In-game action synchronization
-- Game state management
-- Basic conflict resolution
+- Globalni rang lista
+- Osnovno ažuriranje bodova
+- Pregled top 10 igrača
 
-#### 2.3 Ranking System
+### 5. Trivia sustav
 
-- Leaderboards
-- Basic scoring system
-- Player performance tracking
+- 3-5 kategorija pitanja
+- Jednostavna težina pitanja
+- Osnovni sustav bodovanja
+- Baza od 100-200 pitanja
 
-#### 2.4 Skill-based matching System
+## Tehnički zahtjevi
 
-## Technical Requirements
+### Performanse
 
-### 1. Performance
+- Latency < 200ms za real-time operacije
+- Podrška za 50+ simultanih igrača
+- Brzo učitavanje pitanja i odgovora
 
-- Latency under 50ms for local network actions
-- Support for 4-8 simultaneous players
-- 99% uptime for local network
-- Efficient resource usage
+### Sigurnost
 
-### 2. Security
+- Validacija korisničkih unosa
+- Osnovna zaštita od varanja
+- Sigurno spremanje korisničkih podataka
 
-- Basic communication encryption
-- Network security
-- Input validation
-- Basic anti-cheat measures
+### Skalabilnost
 
-### 3. Scalability
+- Jedna Redis instanca
+- Optimizacija Supabase upita
+- Osnovno caching
 
-- Support for multiple local game instances
-- Efficient resource management
-- Local data persistence
-- Backup and restore functionality
+## Struktura projekta
 
-## Technologies
+```
+/
+├── client/           # React frontend
+├── server/           # Node.js backend
+├── redis/            # Redis konfiguracija
+└── supabase/         # Supabase migracije
+```
 
-- Node.js/TypeScript
-- Supabase
-- Redis
-- WebSocket
+## Razvojni plan
+
+1. Postavljanje osnovne strukture projekta
+2. Implementacija korisničkog sustava
+3. Razvoj osnovnog matchmaking sustava
+4. Implementacija real-time igre
+5. Integracija leaderboard sustava
+6. Testiranje i optimizacija
