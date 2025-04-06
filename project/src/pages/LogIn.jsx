@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import "../designs/App.css";
-import "../designs/index.css";
 function LogIn() {
     const [userData, setUserData] = useState({
         username: "",
@@ -25,7 +23,7 @@ function LogIn() {
                 value={userData.password}
                 onChange={changeUserData} />
 
-            <Link to="/mainpage"><button>Log in</button></Link>
+            <Link to="/lobby"><button>Log in</button></Link>
             <p>If you don't have account, sign up!</p>
             <Link to="/signup"><button>Sign up</button></Link>
         </form>

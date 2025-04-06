@@ -1,12 +1,12 @@
 import { Link } from "react-router";
 
-import logo from "./assets/logo_2_2.png";
+import logo from "./assets/logo.png";
 import "./designs/App.css";
 import "./designs/index.css";
 
 function App() {
   return (
-    <div id="home_container">
+    <div class="home_container">
       <img src={logo} alt="logo_image" />
       <h2>Only the Biggest Brains Survive.</h2>
       <p>Put your brain to the test—completely free! Challenge yourself with The Big Brain Theory,

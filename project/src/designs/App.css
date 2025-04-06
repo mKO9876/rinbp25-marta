@@ -1,5 +1,5 @@
 /* HOME */
-#home_container {
+.home_container {
     height: 80vh;
     margin: 20px;
     display: flex;
@@ -8,12 +8,12 @@
     justify-content: space-evenly;
 }
 
-#home_container * {
+.home_container * {
     margin: 10px;
     text-align: center;
 }
 
-#home_container img {
+.home_container img {
     width: 80%;
     height: auto;
 }
@@ -39,59 +39,86 @@
 
 /* LOGIN & SIGNUP */
 
+/* LOBBY */
+#lobby_container {
+    background-color: #9980C1;
+    color: #FFFFFF;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
 
-#leftNav_container {
-    background-color: #03AED2;
-    width: 250px;
-    height: 100vh;
+#category_container {
+    background-color: "rgba(255,255,255,0.1)";
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 500px;
+}
+
+#category_container label {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+#category_container select {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: none;
+    color: #213547;
+}
+
+#lobby_button_container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+}
+
+#lobby_button_container button {
+    background-color: #FBA405;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #213547;
+    box-shadow: 3px 3px #6f5d96;
+    cursor: pointer;
+}
+
+/* LOBBY */
+
+/* NAV TOP */
+
+#nav_top_container {
+    background-color: #8245e3;
+    height: 100px;
+    width: 100vw;
     position: fixed;
     top: 0;
     left: 0;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-#leftNav_container img {
-    height: 100px;
-    width: 100px;
-    padding: 10px;
-    margin: auto;
-}
-
-#leftNav_buttons_container {
-    display: flex;
-    height: 80vh;
-    flex-direction: column;
+    flex-direction: row;
     justify-content: space-between;
     align-items: center;
-
 }
 
-#leftNav_buttons_container button {
-    margin: 10px;
-    height: 50px;
-    width: 200px;
-    padding: 10px;
+#nav_top_container img {
+    width: 250px;
+    height: auto;
 }
 
-#left_nav_2_buttons_container {
-    display: flex;
-    align-items: center;
-    flex-direction: column;
+#nav_top_container * {
+    margin: 15px;
 }
 
-#searchBar {
-    position: fixed;
-    top: 0;
-}
+/* NAV TOP */
 
-#education_container {
-    width: 80vw;
-    position: absolute;
-    right: 0;
-    top: 100px;
-}
 
 /* @media only screen and (max-width: 600px) {
 
