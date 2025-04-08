@@ -1,18 +1,34 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import supabase from "../config/supabaseClient"
 
 import NavTop from "../components/navTop";
 
 const Lobby = () => {
-    const [categories, setCategories] = useState([]);
+    const [fetchError, setFetchError] = useState(null)
+    const [categories, setCategories] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState("");
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetch("https://opentdb.com/api_category.php")
-            .then((res) => res.json())
-            .then((data) => setCategories(data.trivia_categories))
-            .catch((err) => console.error("Error fetching categories:", err));
+        const fetchCategories = async () => {
+            const { data, error } = await supabase
+                .from("categories")
+                .select()
+            if (error) {
+                setFetchError("Could not fetch categories")
+                setCategories(null)
+                console.log(error)
+            }
+
+            if (data) {
+                setCategories(data)
+                setFetchError(null)
+            }
+        }
+
+        fetchCategories()
+
     }, []);
 
     const handleStart = (mode) => {
@@ -26,6 +42,7 @@ const Lobby = () => {
     return (
         <div id="lobby_container">
             <NavTop />
+            {fetchError && (<p>{fetchError}</p>)}
             <div id="category_container">
                 <label>Choose Trivia Category:</label>
                 <select
