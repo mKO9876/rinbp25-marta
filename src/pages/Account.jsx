@@ -1,60 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import supabase from "../config/supabaseClient";
 import NavTop from "../components/navTop";
 
-const mockUser = {
-    username: "trivia_master",
-    email: "user@example.com",
-    password: "********"
-};
 
-const Account = () => {
-    const [user, setUser] = useState(mockUser);
-    const [isEditing, setIsEditing] = useState(false);
+function Account() {
+    const [user, setUser] = useState({
+        username: "",
+        created_at: ""
+    });
+    const navigate = useNavigate();
 
-    const handleChange = (e) => {
-        setUser((prev) => ({
-            ...prev,
-            [e.target.name]: e.target.value
-        }));
-    };
+    async function fetchData(userData) {
+        const { data, error: fetchError } = await supabase
+            .from('players')
+            .select('*')
+            .eq('id', userData.id)
+            .single();
 
-    const handleSave = () => {
-        // You would send this to your backend here
-        console.log("Updated user info:", user);
-        setIsEditing(false);
-    };
+        if (fetchError) throw fetchError;
+        console.log(data)
+        const formattedDate = new Date(data.created_at).toISOString().split('T')[0];
+        setUser({ username: data.username, created_at: formattedDate })
+    }
+
+    useEffect(() => {
+        try {
+            const userData = JSON.parse(localStorage.getItem('user'));
+            if (!userData) {
+                navigate("/login");
+                return;
+            }
+
+            fetchData(userData);
+
+        } catch (err) {
+            console.error("Failed to fetch user:", err);
+            navigate("/login");
+        }
+    }, [navigate]);
 
     return (
         <div id="account_container">
             <NavTop />
             <h1>My Account</h1>
             <div id="account_card">
-                <label>Username</label>
-                <input
-                    name="username"
-                    value={user.username}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                />
-
-                <label>Password</label>
-                <input
-                    name="password"
-                    type="password"
-                    value={user.password}
-                    onChange={handleChange}
-                    disabled={!isEditing}
-                />
-
-                {isEditing ? (
-                    <button onClick={handleSave}>
-                        Save Changes
-                    </button>
-                ) : (
-                    <button onClick={() => setIsEditing(true)}>
-                        Edit Info
-                    </button>
-                )}
+                <label>Username: {user.username}</label>
+                <label>Created at: {user.created_at}</label>
             </div>
         </div>
     );

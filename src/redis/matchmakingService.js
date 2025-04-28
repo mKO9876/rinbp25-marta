@@ -3,37 +3,145 @@ import redisClient from './config.js';
 class MatchmakingService {
     constructor() {
         this.client = redisClient;
+        this.QUEUE_KEY = 'matchmaking:queue';
+        this.PLAYER_DATA_KEY = 'matchmaking:player_data';
     }
 
-    // Dodaj igrača u red za čekanje
-    async addToQueue(playerId, skillLevel) {
-        await this.client.hSet('matchmaking_queue', playerId.toString(), skillLevel);
-    }
+    /**
+     * Add player to matchmaking queue with additional metadata
+     * @param {string} playerId
+     * @param {object} playerData - { skillLevel, username, chosenCategory }
+     * @returns {Promise<boolean>} - returns true if action was successful
+     */
+    async addToQueue(playerId, playerData) {
+        try {
+            const { skillLevel, category } = playerData;
+            const playerKey = `player:${playerId}`;
+            const categoryQueueKey = `matchmaking:queue:${category}`; // Per-category queue
 
-    // Ukloni igrača iz reda za čekanje
-    async removeFromQueue(playerId) {
-        await this.client.hDel('matchmaking_queue', playerId.toString());
-    }
-
-    // Dohvati sve igrače u redu za čekanje
-    async getQueue() {
-        return await this.client.hGetAll('matchmaking_queue');
-    }
-
-    // Pronađi odgovarajućeg protivnika
-    async findMatch(playerId, skillLevel, maxSkillDifference = 100) {
-        const queue = await this.getQueue();
-        const players = Object.entries(queue)
-            .filter(([id, level]) => id !== playerId.toString())
-            .map(([id, level]) => ({
-                id,
-                skillLevel: parseInt(level)
+            // Store player data
+            await this.client.hSet(this.PLAYER_DATA_KEY, playerKey, JSON.stringify({
+                ...playerData,
+                joinedAt: Date.now()
             }));
 
-        return players.find(player =>
-            Math.abs(player.skillLevel - skillLevel) <= maxSkillDifference
-        );
+            // Add to the category-specific Sorted Set
+            await this.client.zAdd(categoryQueueKey, {
+                score: skillLevel,
+                value: playerKey
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Error adding to queue:', error);
+            return false;
+        }
     }
+
+    /**
+     * Remove player from queue completely
+     * @param {string} playerId
+     * @returns {Promise<boolean>}
+     */
+    async removeFromQueue(playerId) {
+        try {
+            const playerKey = `player:${playerId}`;
+            const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
+
+            if (!playerData) return false;
+
+            const { category } = playerData;
+            const categoryQueueKey = `matchmaking:queue:${category}`;
+
+            await Promise.all([
+                this.client.zRem(categoryQueueKey, playerKey),
+                this.client.hDel(this.PLAYER_DATA_KEY, playerKey)
+            ]);
+
+            return true;
+        } catch (error) {
+            console.error('Error removing from queue:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Find best match for a player
+     * @param {string} playerId
+     * @param {number} [maxSkillDifference=100]
+     * @param {number} [maxWaitTime=30000] - Max wait time in ms (30s default)
+     * @returns {Promise<object|null>} - Returns matched player or null
+     */
+    async findMatch(playerId, maxSkillDifference = 100, maxWaitTime = 20000) {
+        try {
+            const playerKey = `player:${playerId}`;
+            const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
+
+            if (!playerData) {
+                await this.removeFromQueue(playerId);
+                return null;
+            }
+
+            const { skillLevel, category, joinedAt } = playerData;
+            const currentTime = Date.now();
+            const timeWaiting = currentTime - joinedAt;
+
+            // Dynamic skill tolerance increases with wait time
+            const dynamicTolerance = Math.min(
+                maxSkillDifference * 2,
+                maxSkillDifference + Math.floor(timeWaiting / 5000) * 20
+            );
+
+            // Search in the player's category queue
+            const categoryQueueKey = `matchmaking:queue:${category}`;
+            const potentialMatches = await this.client.zRangeByScore(
+                categoryQueueKey,
+                skillLevel - dynamicTolerance,
+                skillLevel + dynamicTolerance,
+                { LIMIT: { offset: 0, count: 10 } }
+            );
+
+            // Filter out self and invalid players
+            const opponents = await Promise.all(
+                potentialMatches
+                    .filter(key => key !== playerKey)
+                    .map(async key => ({
+                        key,
+                        data: JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, key))
+                    }))
+            );
+
+            // Find the closest skill match in the same category
+            const bestMatch = opponents.reduce((best, current) => {
+                if (!current.data) return best;
+                const diff = Math.abs(current.data.skillLevel - skillLevel);
+                return (!best || diff < best.diff) ? { ...current, diff } : best;
+            }, null);
+
+            // If a match is found, return
+            if (bestMatch) {
+                return { ...bestMatch.data, id: bestMatch.key.replace('player:', '') };
+            }
+
+            // If no match found, wait for the remaining maxWaitTime and check again
+            const timeElapsed = currentTime - joinedAt;
+            const remainingWaitTime = maxWaitTime - timeElapsed;
+
+            if (remainingWaitTime > 0) {
+                const retryDelay = Math.min(remainingWaitTime, 5000); // Wait up to 5s
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                return this.findMatch(playerId, maxSkillDifference, maxWaitTime);  // Check again
+            }
+
+            // If maxWaitTime has passed and still no match, return null
+            return null;
+        } catch (error) {
+            console.error('Error finding match:', error);
+            return null;
+        }
+    }
+
 }
 
-export default new MatchmakingService(); 
+const matchmakingService = new MatchmakingService();
+export default matchmakingService;

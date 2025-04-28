@@ -6,6 +6,7 @@ import LogIn from "./pages/LogIn";
 import SignUp from "./pages/SignUp";
 import Lobby from "./pages/Lobby";
 import Account from "./pages/Account";
+import Game from "./pages/TheGame";
 
 
 const root = document.getElementById("root");
@@ -18,6 +19,7 @@ ReactDOM.createRoot(root).render(
       <Route path="/signup" element={<SignUp />} />
       <Route path="/lobby" element={<Lobby />} />
       <Route path="/account" element={<Account />} />
+      <Route path="/game" element={<Game />} />
       <Route path="*" element={<NoPage />} />
     </Routes>
   </BrowserRouter>
