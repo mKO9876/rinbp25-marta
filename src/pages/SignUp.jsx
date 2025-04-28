@@ -11,6 +11,7 @@ function SignUp() {
 
     const navigate = useNavigate();
 
+
     function changeUserData(event) {
         const { name, value } = event.target;
         setUserData({ ...userData, [name]: value });
@@ -39,30 +40,45 @@ function SignUp() {
     };
 
     async function handleSignup() {
-        const { data: { user }, error } = await supabase.auth.signUp({
-            email: userData.email,
-            password: userData.password
-        });
+        try {
+            const { count: usernameCount } = await supabase
+                .from('players')
+                .select('*', { count: 'exact', head: true })
+                .eq('username', userData.username)
+                .single();
 
-        if (error) {
-            console.error("Error signing up:", error);
-            return;
-        }
+            if (usernameCount > 0) throw new Error('Username already taken');
 
-        const { data, error: playerError } = await supabase
-            .rpc('create_player_profile', {
-                user_id: user.id,
-                username: userData.username
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: userData.email,
+                password: userData.password,
             });
 
-        if (playerError) {
-            alert("Failed to create profile: " + playerError.message);
-            return;
+            if (authError) {
+                if (authError.message.includes('already registered')) { throw new Error('Email already registered'); }
+                throw authError;
+            }
+
+            const { error: playerError } = await supabase
+                .from('players')
+                .insert({
+                    id: authData.user.id,
+                    username: userData.username
+                });
+
+            if (playerError) { throw new Error("Failed to create profile: " + playerError.message); }
+
+            else {
+                navigate('/lobby');
+                localStorage.setItem('user', JSON.stringify({ id: authData.user.id }));
+            }
         }
 
-        console.log("Player profile created:", data);
-        navigate('/lobby');
+        catch (error) { alert(error) }
+
     }
+
+
 
 
     return (

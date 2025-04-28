@@ -10,7 +10,22 @@ const Lobby = () => {
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
+
     useEffect(() => {
+        const userData = JSON.parse(localStorage.getItem('user'));
+        if (!userData) {
+            navigate("/login");
+            return;
+        }
+    }, [navigate]);
+
+    useEffect(() => {
+        if (!localStorage.getItem('user')) return;
+        const userData = JSON.parse(localStorage.getItem('user'));
+        if (!userData) {
+            navigate("/login");
+            return;
+        }
         const fetchCategories = async () => {
             try {
                 setIsLoading(true);
@@ -37,13 +52,12 @@ const Lobby = () => {
         fetchCategories();
     }, []);
 
-    // ... rest of your component remains the same ...
-    const handleStart = (mode) => {
+    const handleStart = () => {
         if (!selectedCategory) {
             alert("Please select a category.");
             return;
         }
-        navigate(`/game?mode=${mode}&category=${selectedCategory}`);
+        navigate(`/game&category=${selectedCategory}`);
     };
 
     return (
@@ -69,10 +83,7 @@ const Lobby = () => {
 
                     <div id="lobby_button_container">
                         <button onClick={() => handleStart("public")}>
-                            Play with Friends
-                        </button>
-                        <button onClick={() => handleStart("private")}>
-                            Play Private
+                            Play
                         </button>
                     </div>
                 </div>

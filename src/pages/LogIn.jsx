@@ -4,7 +4,7 @@ import supabase from "../config/supabaseClient"
 
 function LogIn() {
     const [userData, setUserData] = useState({
-        username: "",
+        email: "",
         password: ""
     });
 
@@ -34,30 +34,43 @@ function LogIn() {
         }
     };
 
-    async function handleLogin(event) {
-        event.preventDefault();
+    async function handleLogin() {
         try {
-            const { data: { user }, error } = await supabase.auth.signInWithPassword({
+
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                 email: userData.email,
                 password: userData.password
             });
 
-            if (error) throw error;
+            if (authError) {
+                console.error('Authentication error:', authError);
+                throw new Error(authError.message || 'Login failed');
+            }
 
-            // Verify player exists
             const { error: playerError } = await supabase
-                .from('player_players')
-                .select()
-                .eq('id', user.id)
+                .from('players')
+                .select('id, username')
+                .eq('id', authData.user.id)
                 .single();
 
-            if (playerError) throw new Error("Player profile not found");
+            if (playerError) {
+                console.error('RLS Debug:', {
+                    uid: authData.user.id,
+                    isAuthenticated: (await supabase.auth.getSession()).data.session !== null
+                });
+                throw playerError
+            }
 
-            navigate('/dashboard');
+            localStorage.setItem('user', JSON.stringify({
+                id: authData.user.id
+            }));
+
+            navigate('/lobby');
+
 
         } catch (err) {
-            alert(err.message);
-            return;
+            console.error("Login error:", err);
+            alert(err.message || "Login failed. Please try again.");
         }
     }
 
@@ -65,8 +78,8 @@ function LogIn() {
         <form className="registration_container">
             <h1>Log in</h1>
             <p>Welcome back!</p>
-            <input type="text" placeholder="Username" name="username"
-                value={userData.username}
+            <input type="text" placeholder="Email" name="email"
+                value={userData.email}
                 onChange={changeUserData} />
             <input type="password" placeholder="Password" name="password"
                 value={userData.password}
