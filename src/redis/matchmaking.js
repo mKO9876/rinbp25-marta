@@ -72,8 +72,10 @@ class MatchmakingService {
      * @param {number} [maxWaitTime=30000] - Max wait time in ms (30s default)
      * @returns {Promise<object|null>} - Returns matched player or null
      */
-    async findMatch(playerId, maxSkillDifference = 100, maxWaitTime = 20000) {
+    async findMatch(playerId) {
         try {
+            const maxSkillDifference = 100
+            const maxWaitTime = 20000
             const playerKey = `player:${playerId}`;
             const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
 

@@ -68,10 +68,10 @@ function SignUp() {
 
             if (playerError) { throw new Error("Failed to create profile: " + playerError.message); }
 
-            else {
-                navigate('/lobby');
-                localStorage.setItem('user', JSON.stringify({ id: authData.user.id }));
-            }
+            navigate('/lobby');
+            localStorage.setItem('user', JSON.stringify({
+                id: authData.user.id
+            }));
         }
 
         catch (error) { alert(error) }

@@ -7,21 +7,39 @@ import NavTop from "../components/navTop";
 function Account() {
     const [user, setUser] = useState({
         username: "",
-        created_at: ""
+        created_at: "",
+        skill_level: 0
     });
+
+    const [avatar, setAvatar] = useState({
+        rank_name: "",
+        avatar: "https://api.dicebear.com/9.x/big-smile/svg?seed=Jade&flip=true&backgroundType=solid,gradientLinear&backgroundColor=ffd5dc,ffdfbf"
+    });
+
     const navigate = useNavigate();
 
     async function fetchData(userData) {
-        const { data, error: fetchError } = await supabase
+        const { data: playerData, error: fetchError } = await supabase
             .from('players')
             .select('*')
             .eq('id', userData.id)
             .single();
 
         if (fetchError) throw fetchError;
-        console.log(data)
-        const formattedDate = new Date(data.created_at).toISOString().split('T')[0];
-        setUser({ username: data.username, created_at: formattedDate })
+
+        const formattedDate = new Date(playerData.created_at).toString().split('T')[0];
+        setUser({ username: playerData.username, created_at: formattedDate, skill_level: playerData.skill_level });
+
+        const { data: rank, error: error } = await supabase
+            .from('ranks')
+            .select('*')
+            .lte('min_points', playerData.skill_level)
+            .order('min_points', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error) throw error;
+        setAvatar({ rank_name: rank.name, avatar: rank.avatar_url, })
     }
 
     useEffect(() => {
@@ -45,8 +63,24 @@ function Account() {
             <NavTop />
             <h1>My Account</h1>
             <div id="account_card">
-                <label>Username: {user.username}</label>
-                <label>Created at: {user.created_at}</label>
+                <img src={avatar.avatar} alt="" />
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Username:</td>
+                            <td>{user.username}</td>
+                        </tr>
+                        <tr>
+                            <td>Created at:</td>
+                            <td>{user.created_at}</td>
+                        </tr>
+                        <tr>
+                            <td>Skill level:</td>
+                            <td>{avatar.rank_name}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
             </div>
         </div>
     );

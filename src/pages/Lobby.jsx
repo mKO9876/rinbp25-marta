@@ -2,18 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../config/supabaseClient";
 import NavTop from "../components/navTop";
-import matchmakingService from "../redis/matchmakingService"
 
 const Lobby = () => {
     const [fetchError, setFetchError] = useState(null);
     const [categories, setCategories] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState("none");
+    const [selectedCategory, setSelectedCategory] = useState();
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
+    const userData = JSON.parse(localStorage.getItem('user'));
 
     useEffect(() => {
         if (!localStorage.getItem('user')) return;
-        const userData = JSON.parse(localStorage.getItem('user'));
+
         if (!userData) {
             navigate("/login");
             return;
@@ -42,7 +42,7 @@ const Lobby = () => {
         };
 
         fetchCategories();
-    }, [navigate]);
+    }, []);
 
     async function joinQueue() {
         const userData = JSON.parse(localStorage.getItem('user'));
@@ -56,10 +56,14 @@ const Lobby = () => {
             throw new Error('Player data not found');
         }
 
-        //Redis queue
-        await matchmakingService.addToQueue(userData.id, {
-            skillLevel: player.skill_level,
-            username: player.username,
+        //Redis
+        await fetch('http://localhost:3001/join-queue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: userData.id,
+                skillLevel: player.skill_level
+            })
         });
 
         navigate(`/game`);
@@ -100,7 +104,7 @@ const Lobby = () => {
                     </select>
 
                     <div id="lobby_button_container">
-                        <button onClick={handleStart()}>
+                        <button onClick={handleStart}>
                             Play
                         </button>
                     </div>
