@@ -157,6 +157,12 @@
     margin-top: 1rem;
 }
 
+.answers {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+}
+
 /* ACCOUNT */
 
 

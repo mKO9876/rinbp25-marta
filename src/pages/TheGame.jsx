@@ -1,53 +1,136 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../config/supabaseClient";
-function Game() {
 
-    const game = JSON.parse(localStorage.getItem('game'));
+function Game() {
+    const game = JSON.parse(localStorage.getItem("game"));
     const navigate = useNavigate();
-    const [questions, setQuestions] = useState([]); //questions id
-    const [answeres, setAnseres] = useState([]);
+    const user = JSON.parse(localStorage.getItem("user"));
+    const [questionList, setQuestions] = useState([]);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [answers, setAnswers] = useState([]);
+    const [selectedAnswer, setSelectedAnswer] = useState(null);
+    const [currentQuestion, setCurrentQuestion] = useState(null);
 
     useEffect(() => {
-        if (!game) navigate("/login");
-        const fetchQuestions = async () => {
+        if (!game) {
+            navigate("/login");
+            return;
+        }
+
+        const fetchQuestionList = async () => {
             try {
                 const { data, error } = await supabase
-                    .from('game_questions')
-                    .select('*')
-                    .eq('game_id', game.id);
+                    .from("game_questions")
+                    .select("question_id")
+                    .eq("game_id", game.id);
 
                 if (error) throw error;
 
-                setQuestions(data || []);
+                const questionIds = data.map((item) => item.question_id);
+                setQuestions(questionIds);
             } catch (err) {
-                throw Error(err.message);
+                console.error("Error fetching questions:", err);
             }
         };
 
-        fetchQuestions();
-    }, [game]);
+        fetchQuestionList();
+    }, []);
 
-    function randomizeAnsweres() {
 
+    useEffect(() => {
+        if (questionList.length === 0) return;
+
+        const fetchQuestionData = async () => {
+            const questionId = questionList[currentQuestionIndex];
+
+            try {
+                const { data: questionData, error } = await supabase
+                    .from("questions")
+                    .select("question, correct_answer, incorrect_answers")
+                    .eq("id", questionId)
+                    .single();
+
+                if (error) throw error;
+
+                setCurrentQuestion(questionData.question);
+                const shuffledAnswers = [questionData.correct_answer, ...questionData.incorrect_answers]
+                    .sort(() => Math.random() - 0.5);
+                setAnswers(shuffledAnswers);
+            } catch (err) {
+                console.error("Error fetching question data:", err);
+            }
+        };
+
+        fetchQuestionData();
+    }, [questionList, currentQuestionIndex]);
+
+    async function checkUserChoice() {
+        const questionId = questionList[currentQuestionIndex];
+
+        try {
+            const { error: error } = await supabase.from("games_players_questions")
+                .insert({
+                    game_id: game.id,
+                    player_id: user.id,
+                    question_id: questionId,
+                    answer: selectedAnswer,
+                });
+            if (error) {
+                console.error("Supabase Error Details:", {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details,
+                    hint: error.hint
+                });
+                throw error;
+            }
+        } catch (err) {
+            console.error("Error saving answer:", err);
+        }
     }
 
-    function fetchAnsweres() {
+    async function goToNextQuestion() {
+        await checkUserChoice();
 
+        if (currentQuestionIndex < questionList.length - 1) {
+            setCurrentQuestionIndex((prevIndex) => prevIndex + 1);
+            setSelectedAnswer(null);
+        } else {
+            alert("Game over!");
+            navigate("/lobby");
+        }
     }
 
     return (
-        <div>
-            <ul>
-                <p>Something</p>
-                {questions.map(question => (
-                    <li key={question.id}>
-                        <h3>{question.question_text}</h3>
-                        {/* Render other question data as needed */}
-                    </li>
+        <div className="game-container">
+            <div className="score">
+                Question {currentQuestionIndex + 1}/{questionList.length}
+            </div>
+
+            <div className="question">
+                <h2>{currentQuestion}</h2>
+            </div>
+
+            <div className="answers">
+                {answers.map((answer) => (
+                    <button
+                        key={answer}
+                        onClick={() => setSelectedAnswer(answer)}
+                        style={{
+                            backgroundColor: selectedAnswer === answer ? "lightblue" : "white",
+                        }}
+                    >
+                        {answer}
+                    </button>
                 ))}
-            </ul>
+            </div>
+
+            <button onClick={goToNextQuestion} disabled={!selectedAnswer}>
+                Next
+            </button>
         </div>
     );
 }
+
 export default Game;
