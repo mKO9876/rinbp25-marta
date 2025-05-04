@@ -10,18 +10,19 @@ class MatchmakingService {
     /**
      * Add player to matchmaking queue with additional metadata
      * @param {string} playerId
-     * @param {object} playerData - { skillLevel, username, chosenCategory }
+     * @param {number} skillLevel
+     * @param {string} categoryId
      * @returns {Promise<boolean>} - returns true if action was successful
      */
-    async addToQueue(playerId, playerData) {
+    async addToQueue(playerId, skillLevel, categoryId) {
         try {
-            const { skillLevel, category } = playerData;
             const playerKey = `player:${playerId}`;
-            const categoryQueueKey = `matchmaking:queue:${category}`; // Per-category queue
+            const categoryQueueKey = `matchmaking:queue:${categoryId}`; // Per-category queue
 
             // Store player data
             await this.client.hSet(this.PLAYER_DATA_KEY, playerKey, JSON.stringify({
-                ...playerData,
+                skillLevel,
+                categoryId,
                 joinedAt: Date.now()
             }));
 
@@ -68,34 +69,34 @@ class MatchmakingService {
     /**
      * Find best match for a player
      * @param {string} playerId
-     * @param {number} [maxSkillDifference=100]
-     * @param {number} [maxWaitTime=30000] - Max wait time in ms (30s default)
      * @returns {Promise<object|null>} - Returns matched player or null
      */
     async findMatch(playerId) {
         try {
             const maxSkillDifference = 100
-            const maxWaitTime = 20000
+            const maxWaitTime = 10000
             const playerKey = `player:${playerId}`;
             const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
 
+            //Remove player if playerData is empty
             if (!playerData) {
                 await this.removeFromQueue(playerId);
+                console.log("Error with playerData")
                 return null;
             }
 
-            const { skillLevel, category, joinedAt } = playerData;
+            const { skillLevel, categoryId, joinedAt } = playerData;
             const currentTime = Date.now();
             const timeWaiting = currentTime - joinedAt;
 
-            // Dynamic skill tolerance increases with wait time
+            // Dynamic skill - increase skill difference
             const dynamicTolerance = Math.min(
                 maxSkillDifference * 2,
                 maxSkillDifference + Math.floor(timeWaiting / 5000) * 20
             );
 
             // Search in the player's category queue
-            const categoryQueueKey = `matchmaking:queue:${category}`;
+            const categoryQueueKey = `matchmaking:queue:${categoryId}`;
             const potentialMatches = await this.client.zRangeByScore(
                 categoryQueueKey,
                 skillLevel - dynamicTolerance,
@@ -136,6 +137,7 @@ class MatchmakingService {
             }
 
             // If maxWaitTime has passed and still no match, return null
+            await this.removeFromQueue(playerId)
             return null;
         } catch (error) {
             console.error('Error finding match:', error);

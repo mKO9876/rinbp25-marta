@@ -9,7 +9,7 @@ function NavTop() {
     const targetPath = isOnAccountPage ? "/lobby" : "/account";
 
     function logOut() {
-        localStorage.removeItem('user');
+        localStorage.clear();
         navigate("/")
     }
 

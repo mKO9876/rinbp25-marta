@@ -37,32 +37,20 @@ function LogIn() {
     async function handleLogin() {
         try {
 
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email: userData.email,
-                password: userData.password
-            });
+
+
+            const { data: authData, error: authError } = await supabase.from('players')
+                .select("id, skill_level")
+                .eq("email", userData.email,)
+                .single();
 
             if (authError) {
-                console.error('Authentication error:', authError);
                 throw new Error(authError.message || 'Login failed');
             }
 
-            const { error: playerError } = await supabase
-                .from('players')
-                .select('id, username')
-                .eq('id', authData.user.id)
-                .single();
-
-            if (playerError) {
-                console.error('RLS Debug:', {
-                    uid: authData.user.id,
-                    isAuthenticated: (await supabase.auth.getSession()).data.session !== null
-                });
-                throw playerError
-            }
-
             localStorage.setItem('user', JSON.stringify({
-                id: authData.user.id
+                id: authData.id,
+                skill_level: authData.skill_level
             }));
 
             navigate('/lobby');

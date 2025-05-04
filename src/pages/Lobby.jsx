@@ -11,6 +11,7 @@ const Lobby = () => {
     const navigate = useNavigate();
     const userData = JSON.parse(localStorage.getItem('user'));
 
+
     useEffect(() => {
         if (!localStorage.getItem('user')) return;
 
@@ -45,31 +46,66 @@ const Lobby = () => {
     }, []);
 
     async function joinQueue() {
-        const userData = JSON.parse(localStorage.getItem('user'));
-        const { data: player, error } = await supabase
-            .from('players')
-            .select('skill_level, username')
-            .eq('id', userData.id)
-            .single();
-
-        if (error || !player) {
-            throw new Error('Player data not found');
-        }
-
+        const category = JSON.parse(localStorage.getItem('category'));
         //Redis
-        await fetch('http://localhost:3001/join-queue', {
+        await fetch('http://localhost:3001/join-matchmaking', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 playerId: userData.id,
-                skillLevel: player.skill_level
+                skillLevel: userData.skill_level,
+                categoryId: category.id
             })
         });
+        findMatch()
+    }
 
-        navigate(`/game`);
+    async function findMatch() {
+        setIsLoading(true);
+        const response = await fetch('http://localhost:3001/find-match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playerId: userData.id })
+        });
+        if (response.status == 201) {
+            const { data: difficulty, error: ranksError } = await supabase
+                .from('ranks')
+                .select('difficulty_id')
+                .lte('min_points', userData.skill_level)
+                .order('min_points', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (ranksError) {
+                navigate(`/login`);
+                localStorage.clear();
+                throw new Error("Failed to fetch rank: " + ranksError.message);
+            }
+            const { data: data, error: gameError } = await supabase
+                .from('games')
+                .insert({
+                    category_id: selectedCategory,
+                    difficulty_id: difficulty.difficulty_id
+                })
+                .select('id')
+                .single();
+
+            if (gameError) {
+                navigate(`/login`);
+                localStorage.clear();
+                throw new Error("Failed to create game: " + gameError.message);
+            }
+            localStorage.setItem('game', JSON.stringify({ id: data.id }));
+            setIsLoading(false);
+            navigate(`/game`);
+        }
+
+
+        // localStorage.setItem('game', JSON.stringify({ id: gameFound }));
     }
 
     function handleStart() {
+
         if (!selectedCategory || selectedCategory == "none") {
             alert("Please select a category.");
             return;
@@ -87,7 +123,7 @@ const Lobby = () => {
             <NavTop />
             {fetchError && <p className="error-message">{fetchError}</p>}
             {isLoading ? (
-                <p>Loading categories...</p>
+                <p>Loading, please wait...</p>
             ) : (
                 <div id="category_container">
                     <label>Choose Trivia Category:</label>

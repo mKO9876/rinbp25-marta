@@ -44,34 +44,36 @@ function SignUp() {
             const { count: usernameCount } = await supabase
                 .from('players')
                 .select('*', { count: 'exact', head: true })
-                .eq('username', userData.username)
+                .eq('username', userData.username,)
                 .single();
 
             if (usernameCount > 0) throw new Error('Username already taken');
 
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: userData.email,
-                password: userData.password,
-            });
+            const { count: emailCount } = await supabase
+                .from('players')
+                .select('*', { count: 'exact', head: true })
+                .eq('email', userData.email);
 
-            if (authError) {
-                if (authError.message.includes('already registered')) { throw new Error('Email already registered'); }
-                throw authError;
-            }
+            if (emailCount > 0) throw new Error('Email already registered');
 
-            const { error: playerError } = await supabase
+            const { data: data, error: playerError } = await supabase
                 .from('players')
                 .insert({
-                    id: authData.user.id,
-                    username: userData.username
-                });
+                    username: userData.username,
+                    email: userData.email,
+                    password: userData.password
+                })
+                .select('id, skill_level')
+                .single();
 
             if (playerError) { throw new Error("Failed to create profile: " + playerError.message); }
 
-            navigate('/lobby');
             localStorage.setItem('user', JSON.stringify({
-                id: authData.user.id
+                id: data.id,
+                skill_level: data.skill_level
+
             }));
+            navigate('/lobby');
         }
 
         catch (error) { alert(error) }
