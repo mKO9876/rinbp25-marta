@@ -9,6 +9,8 @@ function SignUp() {
         password: ""
     });
 
+    localStorage.clear();
+
     const navigate = useNavigate();
 
 

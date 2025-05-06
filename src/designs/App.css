@@ -157,10 +157,29 @@
     margin-top: 1rem;
 }
 
-.answers {
+.game-container {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    width: 700px;
+    height: 350px;
+
     display: flex;
-    flex-direction: row;
-    justify-content: space-around;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+
+.answers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    height: 160px;
+    margin: 10px;
+}
+
+#nextButton {
+    margin: 5px
 }
 
 /* ACCOUNT */

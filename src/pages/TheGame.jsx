@@ -20,6 +20,7 @@ function Game() {
 
         const fetchQuestionList = async () => {
             try {
+
                 const { data, error } = await supabase
                     .from("game_questions")
                     .select("question_id")
@@ -29,6 +30,7 @@ function Game() {
 
                 const questionIds = data.map((item) => item.question_id);
                 setQuestions(questionIds);
+
             } catch (err) {
                 console.error("Error fetching questions:", err);
             }
@@ -42,7 +44,23 @@ function Game() {
         if (questionList.length === 0) return;
 
         const fetchQuestionData = async () => {
-            const questionId = questionList[currentQuestionIndex];
+            const { data: gameData, error: gameError } = await supabase
+                .from("games")
+                .select("current_question_id")
+                .eq("id", game.id)
+                .single()
+
+            if (gameError) throw Error(gameError)
+
+            let questionId;
+            if (gameData.current_question_id != null) {
+                questionId = gameData.current_question_id
+                const foundIndex = questionList.findIndex(id => id === questionId);
+
+                if (foundIndex !== -1) setCurrentQuestionIndex(foundIndex);
+            }
+
+            else questionId = questionList[currentQuestionIndex];
 
             try {
                 const { data: questionData, error } = await supabase
@@ -69,8 +87,9 @@ function Game() {
         const questionId = questionList[currentQuestionIndex];
 
         try {
-            const { error: error } = await supabase.from("games_players_questions")
-                .insert({
+            const { error: error } = await supabase
+                .from("games_players_questions")
+                .upsert({
                     game_id: game.id,
                     player_id: user.id,
                     question_id: questionId,
@@ -94,10 +113,28 @@ function Game() {
         await checkUserChoice();
 
         if (currentQuestionIndex < questionList.length - 1) {
-            setCurrentQuestionIndex((prevIndex) => prevIndex + 1);
+            const nextIndex = currentQuestionIndex + 1;
+            setCurrentQuestionIndex(nextIndex);
             setSelectedAnswer(null);
+
+            const { error: error } = await supabase
+                .from("games")
+                .update({
+                    current_question_id: questionList[nextIndex]
+                })
+                .eq("id", game.id)
+
+            if (error) throw Error(error)
+
         } else {
-            alert("Game over!");
+            const { error: error } = await supabase
+                .from("games")
+                .update({
+                    status: "ended",
+                    current_question_id: null
+                })
+                .eq("id", game.id)
+            if (error) throw Error(error)
             navigate("/lobby");
         }
     }
@@ -126,7 +163,7 @@ function Game() {
                 ))}
             </div>
 
-            <button onClick={goToNextQuestion} disabled={!selectedAnswer}>
+            <button id="nextButton" onClick={goToNextQuestion} disabled={!selectedAnswer}>
                 Next
             </button>
         </div>

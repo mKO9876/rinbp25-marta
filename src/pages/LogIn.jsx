@@ -8,6 +8,8 @@ function LogIn() {
         password: ""
     });
 
+    localStorage.clear();
+
     const navigate = useNavigate();
 
     function changeUserData(event) {
@@ -36,9 +38,6 @@ function LogIn() {
 
     async function handleLogin() {
         try {
-
-
-
             const { data: authData, error: authError } = await supabase.from('players')
                 .select("id, skill_level")
                 .eq("email", userData.email,)
