@@ -5,66 +5,94 @@ class LeaderboardService {
         this.client = redisClient;
     }
 
-    // Increment player score
-    async incrementScore(playerId, points) {
-        return await this.client.zIncrBy('leaderboard', points, playerId.toString());
+    /**
+     * Initialize a new match leaderboard with all players at 0 points
+     * @param {string} gameId 
+     * @param {Array} players - Array of player objects with id, username, and skill_level
+     * @returns {Promise<boolean>}
+     */
+    async initMatchLeaderboard(gameId, players) {
+        try {
+            const leaderboardKey = `match:${gameId}:leaderboard`;
+            const playersArray = Array.isArray(players) ? players : [players];
+
+            if (!playersArray.length) {
+                throw new Error('No players provided for leaderboard');
+            }
+
+            // Start a transaction
+            const multi = this.client.multi();
+
+            // Delete existing leaderboard
+            multi.del(leaderboardKey);
+
+            // Add all players atomically
+            playersArray.forEach(player => {
+                multi.hSet(
+                    'leaderboard:player_info',
+                    player.id,
+                    JSON.stringify({
+                        username: player.username,
+                        skill_level: player.skill_level
+                    })
+                );
+                multi.zAdd(
+                    leaderboardKey,
+                    { score: 0, value: player.id }
+                );
+            });
+
+            // Execute transaction
+            await multi.exec();
+            return true;
+
+        } catch (error) {
+            console.error('Leaderboard init failed:', error);
+            throw error;
+        }
     }
 
-    // Get player data
-    async getPlayerInfo(playerId) {
-        const data = await this.client.hGet('leaderboard:player_info', playerId.toString());
-        return data ? JSON.parse(data) : null;
+    /**
+     * Add points to a player in a specific match
+     * @param {string} gameId 
+     * @param {string} playerId 
+     * @param {number} points 
+     * @returns {Promise<number>} New score
+     */
+    async addPoints(gameId, playerId, points) {
+        const leaderboardKey = `match:${gameId}:leaderboard`;
+        const newScore = await this.client.zIncrBy(
+            leaderboardKey,
+            points,
+            playerId.toString()
+        );
+        return parseFloat(newScore);
     }
 
-    // Get top players with full info
-    async getTopPlayers(limit = 10) {
-        const players = await this.client.zRevRange('leaderboard', 0, limit - 1, 'WITHSCORES');
+    /**
+     * Get match leaderboard with player info
+     * @param {string} gameId 
+     * @returns {Promise<Array>} Sorted leaderboard
+     */
+    async getLeaderboard(gameId) {
+        const leaderboardKey = `match:${gameId}:leaderboard`;
 
-        return await Promise.all(players.map(async ([playerId, score]) => {
-            const info = await this.getPlayerInfo(playerId);
+        const players = await this.client.zRevRange(  // or zrevrange (check your Redis client)
+            leaderboardKey,
+            0, -1,
+            { WITHSCORES: true }
+        );
+
+        return Promise.all(players.map(async ([playerId, score]) => {
+            const info = await this.client.hGet('leaderboard:player_info', playerId);
             return {
                 playerId,
                 score: parseFloat(score),
-                rank: await this.client.zRevRank('leaderboard', playerId),
-                ...(info || {})
+                ...(info ? JSON.parse(info) : {})
             };
         }));
     }
-
-    // Get players around a specific player (for competitive context)
-    async getPlayersAround(playerId, radius = 2) {
-        const rank = await this.getPlayerRank(playerId);
-        if (rank === null) return null;
-
-        const start = Math.max(0, rank - radius);
-        const end = rank + radius;
-
-        const players = await this.client.zRevRange('leaderboard', start, end, 'WITHSCORES');
-
-        return await Promise.all(players.map(async ([id, score]) => ({
-            playerId: id,
-            score: parseFloat(score),
-            rank: await this.client.zRevRank('leaderboard', id),
-            ...(await this.getPlayerInfo(id)) || {}
-        })));
-    }
-
-    // Get player rank (1-based)
-    async getPlayerRank(playerId) {
-        const rank = await this.client.zRevRank('leaderboard', playerId.toString());
-        return rank !== null ? rank + 1 : null;
-    }
-
-    // Get player score
-    async getPlayerScore(playerId) {
-        const score = await this.client.zScore('leaderboard', playerId.toString());
-        return score ? parseFloat(score) : null;
-    }
-
-    // Reset leaderboard (for testing/seasonal resets)
-    async resetLeaderboard() {
-        await this.client.del('leaderboard');
-    }
 }
 
-export default new LeaderboardService();
+const leaderboardService = new LeaderboardService();
+export default leaderboardService;

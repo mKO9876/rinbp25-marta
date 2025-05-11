@@ -46,7 +46,6 @@ const Lobby = () => {
     }, []);
 
     async function joinQueue() {
-        const category = JSON.parse(localStorage.getItem('category'));
         //Redis
         await fetch('http://localhost:3001/join-matchmaking', {
             method: 'POST',
@@ -54,7 +53,8 @@ const Lobby = () => {
             body: JSON.stringify({
                 playerId: userData.id,
                 skillLevel: userData.skill_level,
-                categoryId: category.id
+                username: userData.username,
+                categoryId: selectedCategory
             })
         });
         findMatch()
@@ -67,41 +67,60 @@ const Lobby = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ playerId: userData.id })
         });
+
+        const { data: difficulty, error: ranksError } = await supabase
+            .from('ranks')
+            .select('difficulty_id')
+            .lte('min_points', userData.skill_level)
+            .order('min_points', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (ranksError) throw ranksError;
+
+        const { data: data, error: gameError } = await supabase
+            .from('games')
+            .insert({
+                category_id: selectedCategory,
+                difficulty_id: difficulty.difficulty_id
+            })
+            .select('id')
+            .single();
+
+        if (gameError) throw gameError;
+
         if (response.status == 201) {
-            const { data: difficulty, error: ranksError } = await supabase
-                .from('ranks')
-                .select('difficulty_id')
-                .lte('min_points', userData.skill_level)
-                .order('min_points', { ascending: false })
-                .limit(1)
-                .single();
+            const res = response.json()
+            console.log("res: ", res)
+            const playersInMatch = res.players;
 
-            if (ranksError) {
-                navigate(`/login`);
-                localStorage.clear();
-                throw new Error("Failed to fetch rank: " + ranksError.message);
-            }
-            const { data: data, error: gameError } = await supabase
-                .from('games')
-                .insert({
-                    category_id: selectedCategory,
-                    difficulty_id: difficulty.difficulty_id
+            await fetch('http://localhost:3001/init-leaderboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: data.id,
+                    players: playersInMatch.map(player => ({
+                        id: player.id,
+                        username: player.username
+                    }))
                 })
-                .select('id')
-                .single();
-
-            if (gameError) {
-                navigate(`/login`);
-                localStorage.clear();
-                throw new Error("Failed to create game: " + gameError.message);
-            }
-            localStorage.setItem('game', JSON.stringify({ id: data.id }));
-            setIsLoading(false);
-            navigate(`/game`);
+            });
+        }
+        else {
+            await fetch('http://localhost:3001/init-leaderboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: data.id,
+                    players: { id: userData.id, username: userData.username }
+                })
+            });
         }
 
 
-        // localStorage.setItem('game', JSON.stringify({ id: gameFound }));
+        localStorage.setItem('game', JSON.stringify({ id: data.id }));
+        setIsLoading(false);
+        navigate(`/game`);
     }
 
     function handleStart() {

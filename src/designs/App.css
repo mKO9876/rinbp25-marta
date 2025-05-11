@@ -184,64 +184,84 @@
 
 /* ACCOUNT */
 
-
-/* const styles= {
-    container: {
-        backgroundColor: "#9980C1",
-            minHeight: "100vh",
-            color: "#FFFFFF",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            fontFamily: "Inter, sans-serif",
-            padding: "2rem"
-    }
-
-    ,
-    card: {
-        backgroundColor: "rgba(255,255,255,0.1)",
-            padding: "2rem",
-            borderRadius: "16px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-            width: "100%",
-            maxWidth: "500px"
-    }
-
-    ,
-    label: {
-        fontSize: "1rem",
-            marginBottom: "0.3rem",
-            display: "block",
-            marginTop: "1rem"
-    }
-
-    ,
-    input: {
-        width: "100%",
-            padding: "0.8rem",
-            borderRadius: "10px",
-            border: "none",
-            fontSize: "1rem",
-            color: "#213547"
-    }
-
-    ,
-    button: {
-        backgroundColor: "#FBA405",
-            color: "#213547",
-            padding: "0.8rem 1.5rem",
-            borderRadius: "10px",
-            fontWeight: "600",
-            fontSize: "1rem",
-            border: "none",
-            marginTop: "2rem",
-            cursor: "pointer",
-            boxShadow: "3px 3px #6f5d96"
-    }
+/* GameResults.css */
+.game-results {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    font-family: Arial, sans-serif;
 }
 
-; */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+}
 
-/* @media only screen and (max-width: 600px) {
+.score-summary {
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
 
-} */
+.skill-level {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #e9ecef;
+    border-radius: 6px;
+}
+
+.update-skill-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 0.5rem;
+}
+
+.update-skill-btn:hover {
+    background-color: #0056b3;
+}
+
+.update-message {
+    color: #28a745;
+    margin-top: 0.5rem;
+}
+
+.leaderboard {
+    margin-top: 2rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+th,
+td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.player-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+
+.current-player {
+    background-color: #e7f5ff;
+    font-weight: bold;
+}

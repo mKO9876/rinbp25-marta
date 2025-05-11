@@ -39,7 +39,7 @@ function LogIn() {
     async function handleLogin() {
         try {
             const { data: authData, error: authError } = await supabase.from('players')
-                .select("id, skill_level")
+                .select("id, skill_level, username")
                 .eq("email", userData.email,)
                 .single();
 
@@ -49,6 +49,7 @@ function LogIn() {
 
             localStorage.setItem('user', JSON.stringify({
                 id: authData.id,
+                username: authData.username,
                 skill_level: authData.skill_level
             }));
 

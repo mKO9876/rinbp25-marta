@@ -46,7 +46,7 @@ function SignUp() {
             const { count: usernameCount } = await supabase
                 .from('players')
                 .select('*', { count: 'exact', head: true })
-                .eq('username', userData.username,)
+                .eq('username', userData.username)
                 .single();
 
             if (usernameCount > 0) throw new Error('Username already taken');
@@ -65,13 +65,14 @@ function SignUp() {
                     email: userData.email,
                     password: userData.password
                 })
-                .select('id, skill_level')
+                .select('id, skill_level, username')
                 .single();
 
             if (playerError) { throw new Error("Failed to create profile: " + playerError.message); }
 
             localStorage.setItem('user', JSON.stringify({
                 id: data.id,
+                username: data.username,
                 skill_level: data.skill_level
 
             }));

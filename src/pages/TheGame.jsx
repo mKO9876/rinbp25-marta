@@ -87,23 +87,40 @@ function Game() {
         const questionId = questionList[currentQuestionIndex];
 
         try {
-            const { error: error } = await supabase
+            const { error: insertError } = await supabase
                 .from("games_players_questions")
                 .upsert({
                     game_id: game.id,
                     player_id: user.id,
                     question_id: questionId,
                     answer: selectedAnswer,
+                })
+
+            if (insertError) { throw insertError; }
+
+            const { data: result, error: error } = await supabase
+                .from("games_players_questions")
+                .select("is_correct")
+                .eq("game_id", game.id)
+                .eq("player_id", user.id)
+                .eq("question_id", questionId)
+                .single()
+
+            if (error) throw error;
+
+            if (result.is_correct) {
+                console.log("i am correct")
+                await fetch('http://localhost:3001/add-points', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        gameId: game.Id,
+                        playerId: user.id
+                    })
                 });
-            if (error) {
-                console.error("Supabase Error Details:", {
-                    message: error.message,
-                    code: error.code,
-                    details: error.details,
-                    hint: error.hint
-                });
-                throw error;
             }
+
+
         } catch (err) {
             console.error("Error saving answer:", err);
         }
@@ -135,7 +152,7 @@ function Game() {
                 })
                 .eq("id", game.id)
             if (error) throw Error(error)
-            navigate("/lobby");
+            navigate("/results");
         }
     }
 
