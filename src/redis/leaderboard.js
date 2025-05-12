@@ -9,7 +9,9 @@ class LeaderboardService {
      * Initialize a new match leaderboard with all players at 0 points
      * @param {string} gameId 
      * @param {Array} players - Array of player objects with id, username, and skill_level
-     * @returns {Promise<boolean>}
+     * @param {string} playerId
+     * @param {string} playerUsername
+    * @returns {Promise<boolean>}
      */
     async initMatchLeaderboard(gameId, players) {
         try {
@@ -20,29 +22,24 @@ class LeaderboardService {
                 throw new Error('No players provided for leaderboard');
             }
 
-            // Start a transaction
             const multi = this.client.multi();
 
-            // Delete existing leaderboard
             multi.del(leaderboardKey);
 
-            // Add all players atomically
             playersArray.forEach(player => {
+                const playerId = String(player.id);
+                const playerUsername = String(player.username);
                 multi.hSet(
                     'leaderboard:player_info',
-                    player.id,
-                    JSON.stringify({
-                        username: player.username,
-                        skill_level: player.skill_level
-                    })
+                    playerId,
+                    playerUsername
                 );
                 multi.zAdd(
                     leaderboardKey,
-                    { score: 0, value: player.id }
+                    { value: playerId, score: 0 }
                 );
             });
 
-            // Execute transaction
             await multi.exec();
             return true;
 
@@ -66,6 +63,7 @@ class LeaderboardService {
             points,
             playerId.toString()
         );
+
         return parseFloat(newScore);
     }
 
@@ -76,21 +74,9 @@ class LeaderboardService {
      */
     async getLeaderboard(gameId) {
         const leaderboardKey = `match:${gameId}:leaderboard`;
+        const players = await this.client.sendCommand(['ZREVRANGE', `${leaderboardKey}`, '0', '-1', 'WITHSCORES']);
 
-        const players = await this.client.zRevRange(  // or zrevrange (check your Redis client)
-            leaderboardKey,
-            0, -1,
-            { WITHSCORES: true }
-        );
-
-        return Promise.all(players.map(async ([playerId, score]) => {
-            const info = await this.client.hGet('leaderboard:player_info', playerId);
-            return {
-                playerId,
-                score: parseFloat(score),
-                ...(info ? JSON.parse(info) : {})
-            };
-        }));
+        return players
     }
 }
 

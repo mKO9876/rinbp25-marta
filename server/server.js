@@ -57,7 +57,6 @@ app.post('/init-leaderboard', async (req, res) => {
 app.post('/add-points', async (req, res) => {
     try {
         const { gameId, playerId } = req.body;
-        console.log("player id: ", playerId)
         const points = 1
         await leaderboardService.addPoints(gameId, playerId, points);
         res.status(200).send("OK");
@@ -69,10 +68,11 @@ app.post('/add-points', async (req, res) => {
 
 app.post('/show-leaderboard', async (req, res) => {
     try {
-        const { gameId } = req.params;
+        const { gameId } = req.body;
         const data = await leaderboardService.getLeaderboard(gameId);
-        console.log("ending: ", data)
-        res.status(200).json(data)
+
+        console.log("data: ", data) // you'll need to edit data when there are multiple players
+        res.status(200).send(data)
     } catch (error) {
         console.error('Error getting match leaderboard:', error);
         res.status(500).json({ success: false, error: error.message });

@@ -114,7 +114,7 @@ function Game() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        gameId: game.Id,
+                        gameId: game.id,
                         playerId: user.id
                     })
                 });
