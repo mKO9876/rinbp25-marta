@@ -31,7 +31,7 @@ function Results() {
                 if (diffError) throw diffError;
 
                 setScoreMultiplier(difficulty.score);
-
+                console.log("game id: ", game.id)
                 const response = await fetch('http://localhost:3001/show-leaderboard', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -59,24 +59,14 @@ function Results() {
                     if (playerError) throw playerError;
                 }
 
-                console.log("data: ", data)
-
-                for (let i = 0; i < data.length; i += 2) {
-                    const playerId = data[i];
-                    const score = data[i + 1];
-                    console.log("playerId: ", playerId);
-                    console.log("user.id: ", user.id);
-                    if (playerId === String(user.id)) {
-                        setCorrectAnswers(score);
-                        break;
-                    }
+                // Pronađi korisnikov rezultat
+                const userResult = data.find(player => player.username === user.username);
+                if (userResult) {
+                    setCorrectAnswers(userResult.score);
                 }
 
-                const formattedLeaderboard = data.reduce((acc, _, i, arr) => {
-                    if (i % 2 === 0) acc.push({ playerId: arr[i], score: arr[i + 1] });
-                    return acc;
-                }, []);
-                setLeaderboard(formattedLeaderboard);
+                // Postavi leaderboard direktno iz novog formata podataka
+                setLeaderboard(data);
 
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -103,14 +93,14 @@ function Results() {
                         <thead>
                             <tr>
                                 <th>Player</th>
-                                <th>Rank</th>
+                                <th>Score</th>
                             </tr>
                         </thead>
                         <tbody>
                             {leaderboard.map((player) => (
-                                <tr key={player.playerId}>
+                                <tr key={player.username}>
                                     <td>
-                                        {player.playerId === user.id ? " (You)" : player.playerId}
+                                        {player.username === user.username ? `${player.username} (You)` : player.username}
                                     </td>
                                     <td>{player.score}</td>
                                 </tr>

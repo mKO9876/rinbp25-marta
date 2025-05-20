@@ -127,7 +127,26 @@ class MatchmakingService {
                 }));
 
             // If matches are found, return them
-            if (bestMatches.length > 0) { return bestMatches; }
+            // After bestMatches found
+            if (bestMatches.length > 0) {
+                const matchedPlayer = bestMatches[0];
+                const matchId = [playerId, matchedPlayer.id].sort().join(':'); // Unique ID for match
+
+                // Store match info in Redis
+                await this.client.hSet('active_matches', matchId, JSON.stringify({
+                    players: [playerId, matchedPlayer.id],
+                    created: false
+                }));
+
+                return {
+                    matchId,
+                    players: [
+                        { id: playerId, username: playerData.username },
+                        matchedPlayer
+                    ]
+                };
+            }
+
 
             // If no match found, wait and try again
             const timeElapsed = currentTime - joinedAt;

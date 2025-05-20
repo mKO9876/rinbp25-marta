@@ -20,15 +20,15 @@ function Game() {
 
         const fetchQuestionList = async () => {
             try {
-
-                const { data, error } = await supabase
+                console.log("game: ", game.id)
+                const { data: questions, error: error } = await supabase
                     .from("game_questions")
                     .select("question_id")
                     .eq("game_id", game.id);
 
                 if (error) throw error;
-
-                const questionIds = data.map((item) => item.question_id);
+                console.log("data: ", questions)
+                const questionIds = questions.map((item) => item.question_id);
                 setQuestions(questionIds);
 
             } catch (err) {

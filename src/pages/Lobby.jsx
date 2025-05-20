@@ -62,11 +62,6 @@ const Lobby = () => {
 
     async function findMatch() {
         setIsLoading(true);
-        const response = await fetch('http://localhost:3001/find-match', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ playerId: userData.id })
-        });
 
         const { data: difficulty, error: ranksError } = await supabase
             .from('ranks')
@@ -78,35 +73,32 @@ const Lobby = () => {
 
         if (ranksError) throw ranksError;
 
-        const { data: data, error: gameError } = await supabase
-            .from('games')
-            .insert({
-                category_id: selectedCategory,
-                difficulty_id: difficulty.difficulty_id
+        const response = await fetch('http://localhost:3001/find-match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerId: userData.id,
+                categoryId: selectedCategory,
+                difficultyId: difficulty.difficulty_id
             })
-            .select('id')
-            .single();
-
-        if (gameError) throw gameError;
+        });
 
         if (response.status == 201) {
-            const res = response.json()
-            console.log("res: ", res)
-            const playersInMatch = res.players;
-
-            await fetch('http://localhost:3001/init-leaderboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    gameId: data.id,
-                    players: playersInMatch.map(player => ({
-                        id: player.id,
-                        username: player.username
-                    }))
-                })
-            });
+            const res = await response.json()
+            localStorage.setItem('game', JSON.stringify({ id: res }));
         }
         else {
+            const { data: data, error: gameError } = await supabase
+                .from('games')
+                .insert({
+                    category_id: selectedCategory,
+                    difficulty_id: difficulty.difficulty_id
+                })
+                .select('id')
+                .single();
+
+            if (gameError) throw gameError;
+
             await fetch('http://localhost:3001/init-leaderboard', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -115,10 +107,10 @@ const Lobby = () => {
                     players: { id: userData.id, username: userData.username }
                 })
             });
+
+            localStorage.setItem('game', JSON.stringify({ id: data.id }));
         }
 
-
-        localStorage.setItem('game', JSON.stringify({ id: data.id }));
         setIsLoading(false);
         navigate(`/game`);
     }

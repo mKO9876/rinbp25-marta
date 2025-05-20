@@ -76,7 +76,16 @@ class LeaderboardService {
         const leaderboardKey = `match:${gameId}:leaderboard`;
         const players = await this.client.sendCommand(['ZREVRANGE', `${leaderboardKey}`, '0', '-1', 'WITHSCORES']);
 
-        return players
+        // Transformiraj rezultate u format [username, score]
+        const formattedLeaderboard = [];
+        for (let i = 0; i < players.length; i += 2) {
+            const playerId = players[i];
+            const score = players[i + 1];
+            const username = await this.client.hGet('leaderboard:player_info', playerId);
+            formattedLeaderboard.push([username, score]);
+        }
+
+        return formattedLeaderboard;
     }
 }
 
