@@ -13,14 +13,13 @@ class MatchmakingService {
      * @param {number} skillLevel
      * @param {string} username
      * @param {string} categoryId
-     * @returns {Promise<boolean>} - returns true if action was successful
+     * @returns {Promise<object|null>} - returns true if action was successful
      */
     async addToQueue(playerId, skillLevel, username, categoryId) {
         try {
             const playerKey = `player:${playerId}`;
-            const categoryQueueKey = `matchmaking:queue:${categoryId}`; // Per-category queue
+            const categoryQueueKey = `matchmaking:waitingQueue:${categoryId}`;
 
-            // Store player data
             await this.client.hSet(this.PLAYER_DATA_KEY, playerKey, JSON.stringify({
                 username,
                 skillLevel,
@@ -28,7 +27,6 @@ class MatchmakingService {
                 joinedAt: Date.now()
             }));
 
-            // Add to the category-specific Sorted Set
             await this.client.zAdd(categoryQueueKey, {
                 score: skillLevel,
                 value: playerKey
@@ -53,8 +51,8 @@ class MatchmakingService {
 
             if (!playerData) return false;
 
-            const { category } = playerData;
-            const categoryQueueKey = `matchmaking:queue:${category}`;
+            const { categoryId } = playerData;
+            const categoryQueueKey = `matchmaking:waitingQueue:${categoryId}`;
 
             await Promise.all([
                 this.client.zRem(categoryQueueKey, playerKey),
@@ -73,40 +71,49 @@ class MatchmakingService {
      * @param {string} playerId
      * @returns {Promise<object|null>} - Returns matched player or null
      */
+
+
     async findMatch(playerId) {
         try {
-            const maxSkillDifference = 100;
-            const maxWaitTime = 10000;
             const playerKey = `player:${playerId}`;
             const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
+            const joinedAt = Date.now();
 
-            // Remove player if playerData is empty
+            //check active matches first
+            const activeMatches = await matchmakingService.client.hGetAll('active_matches');
+            for (const [matchId, matchData] of Object.entries(activeMatches)) {
+                const match = JSON.parse(matchData);
+                if (match.players.includes(playerId)) {
+                    const matchAge = Date.now() - match.timestamp;
+
+                    // If match is less than 10 seconds, confirm it
+                    if (matchAge <= 10000) {
+                        return {
+                            matchId: matchId,
+                            players: JSON.parse(matchData).players
+                        };
+                    }
+                }
+            }
+
             if (!playerData) {
                 await this.removeFromQueue(playerId);
                 console.log("Error with playerData");
                 return null;
             }
 
-            const { skillLevel, categoryId, joinedAt } = playerData;
-            const currentTime = Date.now();
-            const timeWaiting = currentTime - joinedAt;
+            const { skillLevel, categoryId } = playerData;
+            const fixedTolerance = 300;
 
-            // Dynamic skill - increase skill difference
-            const dynamicTolerance = Math.min(
-                maxSkillDifference * 2,
-                maxSkillDifference + Math.floor(timeWaiting / 5000) * 20
-            );
-
-            // Search in the player's category queue
-            const categoryQueueKey = `matchmaking:queue:${categoryId}`;
+            const categoryQueueKey = `matchmaking:waitingQueue:${categoryId}`;
             const potentialMatches = await this.client.zRangeByScore(
                 categoryQueueKey,
-                skillLevel - dynamicTolerance,
-                skillLevel + dynamicTolerance,
+                skillLevel - fixedTolerance,
+                skillLevel + fixedTolerance,
                 { LIMIT: { offset: 0, count: 10 } }
             );
 
-            // Filter out self and invalid players
+            // Avoiding self and invalid users
             const opponents = await Promise.all(
                 potentialMatches
                     .filter(key => key !== playerKey)
@@ -116,7 +123,7 @@ class MatchmakingService {
                     }))
             );
 
-            // Sort by closest skill match and limit to 5
+            // Find players with simmilar skill level
             const bestMatches = opponents
                 .filter(opp => opp.data)
                 .sort((a, b) => Math.abs(a.data.skillLevel - skillLevel) - Math.abs(b.data.skillLevel - skillLevel))
@@ -126,30 +133,48 @@ class MatchmakingService {
                     username: match.data.username
                 }));
 
-            // If matches are found, return them
-            // After bestMatches found
             if (bestMatches.length > 0) {
                 const matchedPlayer = bestMatches[0];
-                const matchId = [playerId, matchedPlayer.id].sort().join(':'); // Unique ID for match
+                const matchId = [playerId, matchedPlayer.id].sort().join(':');
 
-                // Store match info in Redis
+                // Check if it already exists
+                const existingMatch = await this.client.hGet('active_matches', matchId);
+                if (existingMatch) {
+                    const matchData = JSON.parse(existingMatch);
+                    const matchAge = Date.now() - matchData.timestamp;
+
+                    // If it is less than 10 seconds
+                    if (matchAge <= 10000) {
+                        return {
+                            matchId,
+                            players: [
+                                { id: playerId, username: playerData.username },
+                                matchedPlayer
+                            ]
+                        };
+                    }
+                    return null;
+                }
+
+                // Create new match
                 await this.client.hSet('active_matches', matchId, JSON.stringify({
                     players: [playerId, matchedPlayer.id],
-                    created: false
+                    created: false,
+                    timestamp: Date.now()
                 }));
 
-                return {
-                    matchId,
-                    players: [
-                        { id: playerId, username: playerData.username },
-                        matchedPlayer
-                    ]
-                };
+                // Remove players from waitingQueue
+                await Promise.all([
+                    this.removeFromQueue(playerId),
+                    this.removeFromQueue(matchedPlayer.id)
+                ]);
+
+                const players = [playerId, matchedPlayer.id]
+                return { matchId, players };
             }
 
-
-            // If no match found, wait and try again
-            const timeElapsed = currentTime - joinedAt;
+            const timeElapsed = Date.now() - joinedAt;
+            const maxWaitTime = 10000;
             const remainingWaitTime = maxWaitTime - timeElapsed;
 
             if (remainingWaitTime > 0) {
@@ -158,12 +183,27 @@ class MatchmakingService {
                 return this.findMatch(playerId);
             }
 
-            // If maxWaitTime has passed and still no match, return null
             await this.removeFromQueue(playerId);
             return null;
+
         } catch (error) {
             console.error('Error finding match:', error);
-            return null;
+            return "ERROR FINDING MATCH";
+        }
+    }
+
+    /**
+     * Delete match from active matches
+     * @param {string} matchId - ID of the match to delete
+     * @returns {Promise<boolean>} - returns true if match was successfully deleted
+     */
+    async deleteMatch(matchId) {
+        try {
+            const deleted = await this.client.hDel('active_matches', matchId);
+            return deleted === 1;
+        } catch (error) {
+            console.error('Error deleting match:', error);
+            return false;
         }
     }
 

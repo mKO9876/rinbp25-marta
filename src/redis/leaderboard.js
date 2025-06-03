@@ -6,17 +6,38 @@ class LeaderboardService {
     }
 
     /**
+     * Check if leaderboard exists for a game
+     * @param {string} gameId 
+     * @returns {Promise<boolean>}
+     */
+    async leaderboardExists(gameId) {
+        try {
+            const leaderboardKey = `game:${gameId}:leaderboard`;
+            const exists = await this.client.exists(leaderboardKey);
+            return exists === 1;
+        } catch (error) {
+            console.error('Error checking leaderboard existence:', error);
+            return false;
+        }
+    }
+
+    /**
      * Initialize a new match leaderboard with all players at 0 points
      * @param {string} gameId 
      * @param {Array} players - Array of player objects with id, username, and skill_level
-     * @param {string} playerId
-     * @param {string} playerUsername
-    * @returns {Promise<boolean>}
+     * @returns {Promise<boolean>}
      */
     async initMatchLeaderboard(gameId, players) {
         try {
-            const leaderboardKey = `match:${gameId}:leaderboard`;
-            const playersArray = Array.isArray(players) ? players : [players];
+            // Prvo provjeri postoji li već leaderboard
+            const exists = await this.leaderboardExists(gameId);
+            if (exists) {
+                console.log(`Leaderboard for game ${gameId} already exists, skipping initialization`);
+                return true;
+            }
+
+            const leaderboardKey = `game:${gameId}:leaderboard`;
+            const playersArray = Object.entries(players);
 
             if (!playersArray.length) {
                 throw new Error('No players provided for leaderboard');
@@ -26,9 +47,7 @@ class LeaderboardService {
 
             multi.del(leaderboardKey);
 
-            playersArray.forEach(player => {
-                const playerId = String(player.id);
-                const playerUsername = String(player.username);
+            playersArray.forEach(([playerId, playerUsername]) => {
                 multi.hSet(
                     'leaderboard:player_info',
                     playerId,
@@ -41,6 +60,7 @@ class LeaderboardService {
             });
 
             await multi.exec();
+            console.log(`Successfully initialized leaderboard for game ${gameId}`);
             return true;
 
         } catch (error) {
@@ -57,7 +77,7 @@ class LeaderboardService {
      * @returns {Promise<number>} New score
      */
     async addPoints(gameId, playerId, points) {
-        const leaderboardKey = `match:${gameId}:leaderboard`;
+        const leaderboardKey = `game:${gameId}:leaderboard`;
         const newScore = await this.client.zIncrBy(
             leaderboardKey,
             points,
@@ -73,7 +93,7 @@ class LeaderboardService {
      * @returns {Promise<Array>} Sorted leaderboard
      */
     async getLeaderboard(gameId) {
-        const leaderboardKey = `match:${gameId}:leaderboard`;
+        const leaderboardKey = `game:${gameId}:leaderboard`;
         const players = await this.client.sendCommand(['ZREVRANGE', `${leaderboardKey}`, '0', '-1', 'WITHSCORES']);
 
         // Transformiraj rezultate u format [username, score]

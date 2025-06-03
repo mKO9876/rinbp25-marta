@@ -13,8 +13,6 @@ const Lobby = () => {
 
 
     useEffect(() => {
-        if (!localStorage.getItem('user')) return;
-
         if (!userData) {
             navigate("/login");
             return;
@@ -83,36 +81,14 @@ const Lobby = () => {
             })
         });
 
-        if (response.status == 201) {
-            const res = await response.json()
-            localStorage.setItem('game', JSON.stringify({ id: res }));
-        }
-        else {
-            const { data: data, error: gameError } = await supabase
-                .from('games')
-                .insert({
-                    category_id: selectedCategory,
-                    difficulty_id: difficulty.difficulty_id
-                })
-                .select('id')
-                .single();
+        const res = await response.json()
 
-            if (gameError) throw gameError;
+        console.log("FUCKING GAME:", res)
+        // localStorage.setItem('game', JSON.stringify({ id: res.gameId }));
 
-            await fetch('http://localhost:3001/init-leaderboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    gameId: data.id,
-                    players: { id: userData.id, username: userData.username }
-                })
-            });
+        // // setIsLoading(false);
+        // navigate(`/game`);
 
-            localStorage.setItem('game', JSON.stringify({ id: data.id }));
-        }
-
-        setIsLoading(false);
-        navigate(`/game`);
     }
 
     function handleStart() {

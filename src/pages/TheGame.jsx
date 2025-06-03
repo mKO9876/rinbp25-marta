@@ -13,6 +13,7 @@ function Game() {
     const [currentQuestion, setCurrentQuestion] = useState(null);
 
     useEffect(() => {
+        console.log("GAME: ", game)
         if (!game) {
             navigate("/login");
             return;

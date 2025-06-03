@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import supabase from "../config/supabaseClient";
+import { useNavigate } from "react-router-dom";
 
 function Results() {
     const game = JSON.parse(localStorage.getItem("game"));
     const user = JSON.parse(localStorage.getItem("user"));
     const [scoreMultiplier, setScoreMultiplier] = useState(1);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [correctAnswers, setCorrectAnswers] = useState(0)
+    const [correctAnswers, setCorrectAnswers] = useState(0);
+    const navigate = useNavigate()
 
     useEffect(() => {
         if (!game || !user) return;
@@ -76,6 +77,29 @@ function Results() {
         fetchData();
     }, []);
 
+    async function gotoLobby() {
+        try {
+            // Delete leaderboard and match data
+            await fetch('http://localhost:3001/delete-leaderboard-and-match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: game.id
+                })
+            });
+
+            // Clear game data from localStorage
+            localStorage.removeItem('game');
+
+            // Navigate to lobby
+            navigate("/lobby");
+        } catch (error) {
+            console.error("Error cleaning up game data:", error);
+            // Still navigate to lobby even if cleanup fails
+            navigate("/lobby");
+        }
+    }
+
 
 
     return (
@@ -111,7 +135,7 @@ function Results() {
                     <p>No leaderboard data available</p>
                 )}
             </div>
-            <Link to="/lobby"><button>Go to lobby</button></Link>
+            <button onClick={gotoLobby}>Go to lobby</button>
         </div>
     );
 }

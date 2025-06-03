@@ -20,93 +20,124 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 
 // matchmaking
+app.post('/join-matchmaking', async (req, res) => {
+    const { playerId, skillLevel, categoryId } = req.body;
+    const result = await matchmakingService.addToQueue(playerId, skillLevel, categoryId);
+
+    if (result === false)
+        return res.status(500).json({ error: 'Failed to add player to queue' });
+
+    res.status(200).json({ message: 'Player added to matchmaking queue' });
+});
+
 app.post('/find-match', async (req, res) => {
     const { playerId, categoryId, difficultyId } = req.body;
 
     try {
+        // 1. Find or create match
         const match = await matchmakingService.findMatch(playerId);
-
-        if (!match) return res.status(200).send("Waiting for match...");
+        if (!match) return res.status(200).json('WAITING');
 
         const { matchId, players } = match;
 
-        // Check if a game already exists for this match
-        const matchDataRaw = await matchmakingService.client.hGet('active_matches', matchId);
-        const matchData = JSON.parse(matchDataRaw);
+        // 2. Handle game creation
+        const { data: gameExists } = await supabase
+            .from('games')
+            .select('id')
+            .eq('category_id', categoryId)
+            .eq('difficulty_id', difficultyId)
+            .eq('status', 'waiting')
+            .single();
 
-        if (!matchData.created) {
-            // Create game
-            const { data: game, error } = await supabase
+        let gameId;
+
+        if (gameExists != null) {
+            gameId = gameExists.id;
+
+            const { data, error: gameError } = await supabase
                 .from('games')
-                .insert({ category_id: categoryId, difficulty_id: difficultyId })
+                .update({ status: 'active' })
+                .eq('id', gameExists.id);
+
+            if (gameError) {
+                console.error('Game update error:', gameError);
+                return res.status(500).json({ error: gameError.message });
+            }
+        }
+
+        else {
+            const { data: newGame, error } = await supabase
+                .from('games')
+                .insert({ category_id: categoryId, difficulty_id: difficultyId, status: "waiting" })
                 .select('id')
                 .single();
 
             if (error) return res.status(500).json({ error: error.message });
-
-            // Mark game as created in Redis
-            matchData.created = true;
-            matchData.gameId = game.id;
-            await matchmakingService.client.hSet('active_matches', matchId, JSON.stringify(matchData));
-
-            // Init leaderboard
-            await fetch('http://localhost:3001/init-leaderboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    gameId: game.id,
-                    players: players
-                })
-            });
-
-            return res.status(201).json(game.id);
+            gameId = newGame.id
         }
 
-        // If game already created, return existing gameId
-        return res.status(200).json({ gameId: matchData.gameId });
+
+        // 3. Add players with RLS bypass (if needed)
+        const { error: playersError } = await supabase
+            .from('games_players')
+            .upsert(
+                players.map(p => ({
+                    game_id: gameId,
+                    player_id: p,
+                }))
+            );
+
+        if (playersError) { console.error('Player insert failed:', playersError); }
+
+        // 4. Initialize leaderboard with proper data
+        try {
+            let playerData = {};
+            // Use Promise.all to handle async operations properly
+            await Promise.all(players.map(async (player) => {
+                const data = await fetchUsernames(player);
+                playerData[player] = data;
+            }));
+
+            await leaderboardService.initMatchLeaderboard(gameId, playerData);
+        } catch (leaderboardError) {
+            console.error('Non-critical leaderboard error:', leaderboardError);
+            // Continue even if leaderboard fails
+        }
+
+        // 5. Single response point
+        return res.status(201).json(gameId);
 
     } catch (error) {
-        console.error("Error in /find-match:", error);
-        return res.status(500).json({ error: 'Internal server error' });
+        console.error('Matchmaking error:', error);
+        if (!res.headersSent) {
+            return res.status(500).json({
+                error: error.message || 'Matchmaking failed'
+            });
+        }
     }
 });
 
+async function fetchUsernames(player) {
+    try {
+        const { data, error } = await supabase
+            .from('players')
+            .select('username')
+            .eq('id', player)
+            .single();
 
-app.post('/join-matchmaking', async (req, res) => {
-    const { playerId, skillLevel, username, categoryId } = req.body;
-    const ok = await matchmakingService.addToQueue(playerId, skillLevel, username, categoryId);
-    if (ok) res.send({ message: 'Player added to matchmaking queue' });
-    else res.status(500)
-});
-
-app.delete('/remove-from-queue', async (req, res) => {
-    const { playerId } = req.body;
-    await matchmakingService.removeFromQueue(playerId);
-    res.send({ message: 'Player removed from matchmaking queue' });
-});
+        if (error) {
+            console.error('Supabase error:', error);
+            return null;
+        }
+        return data?.username || null;
+    } catch (err) {
+        console.error('Error fetching username:', err);
+        return null;
+    }
+}
 
 
 // leaderboard
-app.post('/init-leaderboard', async (req, res) => {
-    try {
-        const { gameId, players } = req.body;
-
-        if (!gameId || !players) {
-            return res.status(400).json({
-                success: false,
-                error: "Missing gameId or players array"
-            });
-        }
-
-        await leaderboardService.initMatchLeaderboard(gameId, players);
-        res.status(201).json({ success: true });
-
-    } catch (error) {
-        console.error('Error initializing leaderboard:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
 app.post('/add-points', async (req, res) => {
     try {
         const { gameId, playerId } = req.body;
@@ -137,7 +168,35 @@ app.post('/show-leaderboard', async (req, res) => {
     }
 });
 
-// app.post("/delete-leaderboard")
+
+
+app.post("/delete-leaderboard-and-match", async (req, res) => {
+    try {
+        const { gameId } = req.body;
+
+        if (!gameId) {
+            return res.status(400).json({
+                success: false,
+                error: "Missing gameId"
+            });
+        }
+
+        // Delete leaderboard
+        const leaderboardKey = `match:${gameId}:leaderboard`;
+        await leaderboardService.client.del(leaderboardKey);
+
+        // Delete player info for this game
+        const players = await leaderboardService.getLeaderboard(gameId);
+        for (const [username, _] of players) {
+            await leaderboardService.client.hDel('leaderboard:player_info', username);
+        }
+
+        res.status(200).json({ success: true, message: "Leaderboard and match data deleted successfully" });
+    } catch (error) {
+        console.error('Error deleting leaderboard and match:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 
 app.listen(PORT, () => {
