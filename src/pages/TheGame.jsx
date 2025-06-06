@@ -13,7 +13,7 @@ function Game() {
     const [currentQuestion, setCurrentQuestion] = useState(null);
 
     useEffect(() => {
-        console.log("GAME: ", game)
+        // console.log("GAME: ", game)
         if (!game) {
             navigate("/login");
             return;
@@ -21,14 +21,14 @@ function Game() {
 
         const fetchQuestionList = async () => {
             try {
-                console.log("game: ", game.id)
+                // console.log("game: ", game.id)
                 const { data: questions, error: error } = await supabase
                     .from("game_questions")
                     .select("question_id")
                     .eq("game_id", game.id);
 
                 if (error) throw error;
-                console.log("data: ", questions)
+                // console.log("data: ", questions)
                 const questionIds = questions.map((item) => item.question_id);
                 setQuestions(questionIds);
 
@@ -110,7 +110,7 @@ function Game() {
             if (error) throw error;
 
             if (result.is_correct) {
-                console.log("i am correct")
+                // console.log("i am correct")
                 await fetch('http://localhost:3001/add-points', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

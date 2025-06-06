@@ -15,13 +15,12 @@ class MatchmakingService {
      * @param {string} categoryId
      * @returns {Promise<object|null>} - returns true if action was successful
      */
-    async addToQueue(playerId, skillLevel, username, categoryId) {
+    async addToQueue(playerId, skillLevel, categoryId) {
         try {
             const playerKey = `player:${playerId}`;
             const categoryQueueKey = `matchmaking:waitingQueue:${categoryId}`;
 
             await this.client.hSet(this.PLAYER_DATA_KEY, playerKey, JSON.stringify({
-                username,
                 skillLevel,
                 categoryId,
                 joinedAt: Date.now()
@@ -48,7 +47,6 @@ class MatchmakingService {
         try {
             const playerKey = `player:${playerId}`;
             const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
-
             if (!playerData) return false;
 
             const { categoryId } = playerData;
@@ -66,6 +64,7 @@ class MatchmakingService {
         }
     }
 
+
     /**
      * Find best match for a player
      * @param {string} playerId
@@ -73,47 +72,64 @@ class MatchmakingService {
      */
 
 
-    async findMatch(playerId) {
+    async findMatch(playerId, maxWaitTime = 10000) {
         try {
             const playerKey = `player:${playerId}`;
             const playerData = JSON.parse(await this.client.hGet(this.PLAYER_DATA_KEY, playerKey));
-            const joinedAt = Date.now();
 
-            //check active matches first
-            const activeMatches = await matchmakingService.client.hGetAll('active_matches');
+            if (!playerData) {
+                console.log("Nema podataka za igrača:", playerId);
+                return {
+                    matchId: null,
+                    players: [playerId]
+                };
+            }
+
+            const { skillLevel, categoryId } = playerData;
+
+            // Provjeri postojeće aktivne utakmice
+            const activeMatches = await this.client.hGetAll('active_matches');
             for (const [matchId, matchData] of Object.entries(activeMatches)) {
                 const match = JSON.parse(matchData);
                 if (match.players.includes(playerId)) {
                     const matchAge = Date.now() - match.timestamp;
-
-                    // If match is less than 10 seconds, confirm it
                     if (matchAge <= 10000) {
                         return {
                             matchId: matchId,
-                            players: JSON.parse(matchData).players
+                            players: match.players
                         };
                     }
                 }
             }
 
-            if (!playerData) {
-                await this.removeFromQueue(playerId);
-                console.log("Error with playerData");
-                return null;
+            const categoryQueueKey = `matchmaking:waitingQueue:${categoryId}`;
+            const queueSize = await this.client.zCard(categoryQueueKey);
+
+            // Ako nema drugih igrača u redu čekanja za ovu kategoriju
+            if (queueSize <= 1) {
+                // Umjesto da odmah vratimo null, čekamo ostatak vremena
+                const remainingWaitTime = maxWaitTime - 1000;
+                if (remainingWaitTime > 0) {
+                    console.log(`Igrač ${playerId} čeka još ${remainingWaitTime}ms za potencijalne protivnike`);
+                    await new Promise(resolve => setTimeout(resolve, Math.min(remainingWaitTime, 2000)));
+                    return this.findMatch(playerId, remainingWaitTime);
+                }
+                return {
+                    matchId: null,
+                    players: [playerId]
+                };
             }
 
-            const { skillLevel, categoryId } = playerData;
-            const fixedTolerance = 300;
-
-            const categoryQueueKey = `matchmaking:waitingQueue:${categoryId}`;
+            // Pronađi potencijalne protivnike s istom kategorijom i sličnim skill levelom
+            const skillTolerance = Math.max(300, Math.floor(skillLevel * 0.2));
             const potentialMatches = await this.client.zRangeByScore(
                 categoryQueueKey,
-                skillLevel - fixedTolerance,
-                skillLevel + fixedTolerance,
+                skillLevel - skillTolerance,
+                skillLevel + skillTolerance,
                 { LIMIT: { offset: 0, count: 10 } }
             );
 
-            // Avoiding self and invalid users
+            // Filtriraj i dohvati podatke o protivnicima
             const opponents = await Promise.all(
                 potentialMatches
                     .filter(key => key !== playerKey)
@@ -123,72 +139,69 @@ class MatchmakingService {
                     }))
             );
 
-            // Find players with simmilar skill level
-            const bestMatches = opponents
-                .filter(opp => opp.data)
-                .sort((a, b) => Math.abs(a.data.skillLevel - skillLevel) - Math.abs(b.data.skillLevel - skillLevel))
-                .slice(0, 5)
-                .map(match => ({
-                    id: match.key.replace('player:', ''),
-                    username: match.data.username
-                }));
+            // Filtriraj protivnike koji žele igrati istu kategoriju
+            const validOpponents = opponents
+                .filter(opp => opp.data && opp.data.categoryId === categoryId)
+                .sort((a, b) => Math.abs(a.data.skillLevel - skillLevel) - Math.abs(b.data.skillLevel - skillLevel));
 
-            if (bestMatches.length > 0) {
-                const matchedPlayer = bestMatches[0];
-                const matchId = [playerId, matchedPlayer.id].sort().join(':');
+            if (validOpponents.length > 0) {
+                const matchedPlayer = validOpponents[0];
+                const matchId = [playerId, matchedPlayer.key.replace('player:', '')].sort().join(':');
 
-                // Check if it already exists
+                // Provjeri postoji li već utakmica
                 const existingMatch = await this.client.hGet('active_matches', matchId);
                 if (existingMatch) {
                     const matchData = JSON.parse(existingMatch);
                     const matchAge = Date.now() - matchData.timestamp;
-
-                    // If it is less than 10 seconds
                     if (matchAge <= 10000) {
                         return {
                             matchId,
-                            players: [
-                                { id: playerId, username: playerData.username },
-                                matchedPlayer
-                            ]
+                            players: matchData.players
                         };
                     }
-                    return null;
                 }
 
-                // Create new match
+                // Kreiraj novu utakmicu
                 await this.client.hSet('active_matches', matchId, JSON.stringify({
-                    players: [playerId, matchedPlayer.id],
-                    created: false,
+                    players: [playerId, matchedPlayer.key.replace('player:', '')],
+                    categoryId: categoryId,
                     timestamp: Date.now()
                 }));
 
-                // Remove players from waitingQueue
+                // Ukloni igrače iz reda čekanja
                 await Promise.all([
                     this.removeFromQueue(playerId),
-                    this.removeFromQueue(matchedPlayer.id)
+                    this.removeFromQueue(matchedPlayer.key.replace('player:', ''))
                 ]);
 
-                const players = [playerId, matchedPlayer.id]
-                return { matchId, players };
+                return {
+                    matchId,
+                    players: [playerId, matchedPlayer.key.replace('player:', '')]
+                };
             }
 
-            const timeElapsed = Date.now() - joinedAt;
-            const maxWaitTime = 10000;
-            const remainingWaitTime = maxWaitTime - timeElapsed;
-
+            // Ako nema odgovarajućih protivnika, pokušaj ponovno nakon kratkog čekanja
+            const remainingWaitTime = maxWaitTime - 1000;
             if (remainingWaitTime > 0) {
-                const retryDelay = Math.min(remainingWaitTime, 5000);
+                console.log(`Igrač ${playerId} čeka još ${remainingWaitTime}ms za potencijalne protivnike`);
+                const retryDelay = Math.min(remainingWaitTime, 2000);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
-                return this.findMatch(playerId);
+                return this.findMatch(playerId, remainingWaitTime);
             }
 
-            await this.removeFromQueue(playerId);
-            return null;
+            // Ako nema pronađenih utakmica nakon maksimalnog vremena čekanja
+            console.log(`Igrač ${playerId} nije pronašao protivnika nakon ${maxWaitTime}ms čekanja`);
+            return {
+                matchId: null,
+                players: [playerId]
+            };
 
         } catch (error) {
-            console.error('Error finding match:', error);
-            return "ERROR FINDING MATCH";
+            console.error('Greška pri pronalaženju utakmice:', error);
+            return {
+                matchId: null,
+                players: [playerId]
+            };
         }
     }
 

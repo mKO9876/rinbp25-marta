@@ -51,7 +51,6 @@ const Lobby = () => {
             body: JSON.stringify({
                 playerId: userData.id,
                 skillLevel: userData.skill_level,
-                username: userData.username,
                 categoryId: selectedCategory
             })
         });
@@ -82,12 +81,10 @@ const Lobby = () => {
         });
 
         const res = await response.json()
-
-        console.log("FUCKING GAME:", res)
-        // localStorage.setItem('game', JSON.stringify({ id: res.gameId }));
-
-        // // setIsLoading(false);
-        // navigate(`/game`);
+        localStorage.setItem('game', JSON.stringify({ id: res.game_id }));
+        localStorage.setItem('match', JSON.stringify({ id: res.match_id }));
+        setIsLoading(false);
+        navigate(`/game`);
 
     }
 

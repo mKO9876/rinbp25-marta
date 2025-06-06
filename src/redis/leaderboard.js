@@ -21,6 +21,39 @@ class LeaderboardService {
         }
     }
 
+
+    /**
+ * Return the winner of the game
+ * @param {string} gameId 
+ * @returns {Promise<boolean>}
+ */
+    async returnWinner(gameId) {
+        const leaderboardKey = `game:${gameId}:leaderboard`;
+
+        try {
+            // Check if leaderboard exists and has players
+            const leaderboardSize = await this.client.zCard(leaderboardKey);
+
+            if (leaderboardSize === 0) {
+                console.warn(`Leaderboard empty for game ${gameId}`);
+                return null;  // Explicitly return null instead of throwing
+            }
+
+            // Get top player
+            const topPlayers = await this.client.zRange(
+                leaderboardKey,
+                0, 0,  // Get first-ranked player
+                { REV: true, WITHSCORES: true }
+            );
+
+            return topPlayers[0];  // Return playerId
+
+        } catch (error) {
+            console.error(`Error determining winner for game ${gameId}:`, error);
+            throw new Error('Failed to determine winner');
+        }
+    }
+
     /**
      * Initialize a new match leaderboard with all players at 0 points
      * @param {string} gameId 
@@ -107,7 +140,51 @@ class LeaderboardService {
 
         return formattedLeaderboard;
     }
+
+    /**
+ * Get match leaderboard with player info
+ * @param {string} gameId 
+ * @returns {Promise<Array>} Sorted leaderboard
+ */
+
+    async deleteLeaderboard(gameId) {
+        if (!await this.leaderboardExists(gameId)) {
+            console.log('Leaderboard not found');
+            return true;
+        }
+
+        const leaderboardKey = `game:${gameId}:leaderboard`;
+
+        try {
+            // 1. First get all player IDs from the sorted set
+            const playerIds = await this.client.zRange(leaderboardKey, 0, -1);
+
+            // 2. Start a transaction for atomic deletion
+            const multi = this.client.multi();
+
+            // Delete the leaderboard sorted set
+            multi.del(leaderboardKey);
+
+            // Delete each player's info from the hash
+            playerIds.forEach(playerId => {
+                multi.hDel('leaderboard:player_info', playerId);
+            });
+
+            // Execute all commands atomically
+            const results = await multi.exec();
+
+            console.log(`Deleted leaderboard ${leaderboardKey} and ${playerIds.length} player entries`);
+            return {
+                success: results[0] === 1,  // First result is from DEL command
+                playersRemoved: playerIds.length
+            };
+        } catch (err) {
+            console.error('Redis error:', err);
+            throw new Error('Failed to delete leaderboard');
+        }
+    }
 }
+
 
 const leaderboardService = new LeaderboardService();
 export default leaderboardService;

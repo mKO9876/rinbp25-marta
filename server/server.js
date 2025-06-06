@@ -27,7 +27,7 @@ app.post('/join-matchmaking', async (req, res) => {
     if (result === false)
         return res.status(500).json({ error: 'Failed to add player to queue' });
 
-    res.status(200).json({ message: 'Player added to matchmaking queue' });
+    return res.status(200).json({ message: 'Player added to matchmaking queue' });
 });
 
 app.post('/find-match', async (req, res) => {
@@ -36,9 +36,6 @@ app.post('/find-match', async (req, res) => {
     try {
         // 1. Find or create match
         const match = await matchmakingService.findMatch(playerId);
-        if (!match) return res.status(200).json('WAITING');
-
-        const { matchId, players } = match;
 
         // 2. Handle game creation
         const { data: gameExists } = await supabase
@@ -50,11 +47,13 @@ app.post('/find-match', async (req, res) => {
             .single();
 
         let gameId;
+        console.log("MATCH: ", match)
+        const { matchId, players } = match;
 
         if (gameExists != null) {
             gameId = gameExists.id;
 
-            const { data, error: gameError } = await supabase
+            const { error: gameError } = await supabase
                 .from('games')
                 .update({ status: 'active' })
                 .eq('id', gameExists.id);
@@ -65,7 +64,7 @@ app.post('/find-match', async (req, res) => {
             }
         }
 
-        else {
+        else if (!gameExists || !matchId) {
             const { data: newGame, error } = await supabase
                 .from('games')
                 .insert({ category_id: categoryId, difficulty_id: difficultyId, status: "waiting" })
@@ -75,7 +74,6 @@ app.post('/find-match', async (req, res) => {
             if (error) return res.status(500).json({ error: error.message });
             gameId = newGame.id
         }
-
 
         // 3. Add players with RLS bypass (if needed)
         const { error: playersError } = await supabase
@@ -98,6 +96,8 @@ app.post('/find-match', async (req, res) => {
                 playerData[player] = data;
             }));
 
+            console.log("PLAYER DATA: ", playerData)
+
             await leaderboardService.initMatchLeaderboard(gameId, playerData);
         } catch (leaderboardError) {
             console.error('Non-critical leaderboard error:', leaderboardError);
@@ -105,7 +105,7 @@ app.post('/find-match', async (req, res) => {
         }
 
         // 5. Single response point
-        return res.status(201).json(gameId);
+        return res.status(201).json({ game_id: gameId, match_id: matchId });
 
     } catch (error) {
         console.error('Matchmaking error:', error);
@@ -168,33 +168,61 @@ app.post('/show-leaderboard', async (req, res) => {
     }
 });
 
+app.post("/get-winner", async (req, res) => {
+    const { gameId, scoreAdd } = req.body;
+    const playerId = await leaderboardService.returnWinner(gameId)
+    if (playerId) return res.status(200).send("OK")
 
+    const { data: player, error: playerError } = await supabase
+        .from('players')
+        .select('skill_level')
+        .eq('id', playerId)
+        .single();
+
+    if (playerError) throw playerError;
+
+    if (!player) throw new Error('Player not found');
+
+    const currentSkill = player.skill_level || 0;
+    const newSkill = currentSkill + scoreAdd;
+
+    // 3. Update the player record
+    const { error: updateError } = await supabase
+        .from('players')
+        .update({ skill_level: newSkill })
+        .eq('id', playerId);
+
+    if (updateError) throw updateError;
+
+    const { error: updateGPError } = await supabase
+        .from('games_players')
+        .update('winner', true)
+        .eq('player_id', playerId)
+        .eq('game_id', gameId)
+        .single();
+
+    if (updateGPError) throw updateGPError;
+
+    return res.status(201).send("Updated");
+})
 
 app.post("/delete-leaderboard-and-match", async (req, res) => {
     try {
-        const { gameId } = req.body;
+        const { gameId, matchId } = req.body;
 
-        if (!gameId) {
-            return res.status(400).json({
-                success: false,
-                error: "Missing gameId"
-            });
+        if (!gameId) return res.status(400).json("Missing gameId");
+        let matchData = true;
+        if (matchId != null) {
+            matchData = await matchmakingService.deleteMatch(matchId);
         }
+        const leaderboardData = await leaderboardService.deleteLeaderboard(gameId);
 
-        // Delete leaderboard
-        const leaderboardKey = `match:${gameId}:leaderboard`;
-        await leaderboardService.client.del(leaderboardKey);
+        if (matchData && leaderboardData) return res.status(200).send("OK");
+        return res.status(500).send("SOMETHING WENT WRONG");
 
-        // Delete player info for this game
-        const players = await leaderboardService.getLeaderboard(gameId);
-        for (const [username, _] of players) {
-            await leaderboardService.client.hDel('leaderboard:player_info', username);
-        }
-
-        res.status(200).json({ success: true, message: "Leaderboard and match data deleted successfully" });
     } catch (error) {
         console.error('Error deleting leaderboard and match:', error);
-        res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 

@@ -5,13 +5,18 @@ import { useNavigate } from "react-router-dom";
 function Results() {
     const game = JSON.parse(localStorage.getItem("game"));
     const user = JSON.parse(localStorage.getItem("user"));
-    const [scoreMultiplier, setScoreMultiplier] = useState(1);
+    const match = JSON.parse(localStorage.getItem("match"));
+
+    const [scoreAdd, setScoreAdd] = useState(1);
     const [leaderboard, setLeaderboard] = useState([]);
     const [correctAnswers, setCorrectAnswers] = useState(0);
     const navigate = useNavigate()
 
     useEffect(() => {
-        if (!game || !user) return;
+        if (!game || !user || !match) {
+            navigate("/login");
+            localStorage.clear();
+        }
 
         const fetchData = async () => {
             try {
@@ -31,8 +36,8 @@ function Results() {
 
                 if (diffError) throw diffError;
 
-                setScoreMultiplier(difficulty.score);
-                console.log("game id: ", game.id)
+                setScoreAdd(difficulty.score);
+
                 const response = await fetch('http://localhost:3001/show-leaderboard', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -43,61 +48,54 @@ function Results() {
 
                 let data = await response.json()
 
-                if (data.length <= 2) {
-                    const { error: playerError } = await supabase
-                        .from('players')
-                        .update({ skill_level: scoreMultiplier + user.skill_level })
-                        .eq('id', user.id);
-
-                    if (playerError) throw playerError;
-                }
-                else if (user.skill_level > 0) {
-                    const { error: playerError } = await supabase
-                        .from('players')
-                        .update({ skill_level: user.skill_level - scoreMultiplier })
-                        .eq('id', user.id);
-
-                    if (playerError) throw playerError;
-                }
-
                 // Pronađi korisnikov rezultat
                 const userResult = data.find(player => player.username === user.username);
-                if (userResult) {
-                    setCorrectAnswers(userResult.score);
-                }
-
-                // Postavi leaderboard direktno iz novog formata podataka
+                if (userResult) setCorrectAnswers(userResult.score);
                 setLeaderboard(data);
 
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
+            } catch (error) { console.error("Error fetching data:", error) }
         };
-
         fetchData();
     }, []);
 
     async function gotoLobby() {
         try {
+            await fetch('http://localhost:3001/get-winner', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: game.id,
+                    score: scoreAdd
+
+                })
+            })
+
             // Delete leaderboard and match data
             await fetch('http://localhost:3001/delete-leaderboard-and-match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    gameId: game.id
+                    gameId: game.id,
+                    matchId: match.id
                 })
             });
 
             // Clear game data from localStorage
             localStorage.removeItem('game');
+            localStorage.removeItem('match');
 
             // Navigate to lobby
             navigate("/lobby");
+
         } catch (error) {
             console.error("Error cleaning up game data:", error);
             // Still navigate to lobby even if cleanup fails
             navigate("/lobby");
         }
+    }
+
+    async function DeleteMatchLeaderboard() {
+
     }
 
 
